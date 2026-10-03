@@ -6,6 +6,7 @@ import { useAppStore } from '@/store/appStore';
 import { api } from '@/lib/api';
 import { SensorEngine } from '@/lib/sensorEngine';
 import ReportModal from '@/components/ReportModal';
+import AddHavenModal from '@/components/AddHavenModal';
 
 let maplibregl: any;
 
@@ -25,15 +26,19 @@ export default function MapPage() {
   const sensorRef = useRef<SensorEngine | null>(null);
   const userMarkerRef = useRef<any>(null);
   const destMarkerRef = useRef<any>(null);
+  const havenMarkersRef = useRef<any[]>([]);
 
   const {
     reports, setReports,
+    safeHavens,
     routeData, setRouteData,
     activeRoute, setActiveRoute,
     activateSOS,
     reportModalOpen, setReportModalOpen,
+    addHavenModalOpen, setAddHavenModalOpen,
     setUserLocation, userLocation,
     destination, setDestination,
+    deadManSettings,
   } = useAppStore();
 
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -42,7 +47,7 @@ export default function MapPage() {
   // Load MapLibre and init map
   useEffect(() => {
     (async () => {
-      const mod = await import('maplibre-gl');
+      const mod: any = await import('maplibre-gl');
       maplibregl = mod.default || mod;
       await import('maplibre-gl/dist/maplibre-gl.css' as any);
       maplibregl.setWorkerUrl('https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl-worker.mjs');
@@ -63,7 +68,7 @@ export default function MapPage() {
         map.addSource('fast-route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addSource('reports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
-        // Both routes always visible; active one is thicker/brighter (updated via setPaintProperty)
+        // Both routes always visible; active one is thicker/brighter
         map.addLayer({
           id: 'fast-route-line', type: 'line', source: 'fast-route',
           paint: { 'line-color': '#3b82f6', 'line-width': 3, 'line-opacity': 0.35, 'line-dasharray': [4, 2] },
@@ -141,7 +146,7 @@ export default function MapPage() {
     if (routeData.fastest) mapRef.current.getSource('fast-route')?.setData(routeData.fastest);
   }, [routeData, mapLoaded]);
 
-  // Sync markers
+  // Sync markers (User + Destination)
   useEffect(() => {
     if (!mapRef.current || !maplibregl) return;
     if (userLocation) {
@@ -164,7 +169,62 @@ export default function MapPage() {
     }
   }, [userLocation, destination, mapLoaded]);
 
-  // Highlight active route (both stay visible; active = thick+bright, inactive = thin+dim)
+  // Sync Safe Havens markers (Police, Safe Havens, Personal places)
+  useEffect(() => {
+    if (!mapRef.current || !maplibregl || !mapLoaded) return;
+
+    // Clear old haven markers
+    havenMarkersRef.current.forEach((m) => m.remove());
+    havenMarkersRef.current = [];
+
+    safeHavens.forEach((haven) => {
+      const el = document.createElement('div');
+      el.className = 'custom-haven-marker flex items-center justify-center cursor-pointer transform hover:scale-125 transition-transform';
+      
+      const badgeBg = haven.category === 'Police'
+        ? 'bg-blue-600 border-blue-300'
+        : haven.category === 'SafeHaven'
+        ? 'bg-emerald-600 border-emerald-300'
+        : haven.category === 'Medical'
+        ? 'bg-red-600 border-red-300'
+        : 'bg-purple-600 border-purple-300';
+
+      el.innerHTML = `
+        <div class="w-8 h-8 rounded-full ${badgeBg} border-2 text-white flex items-center justify-center text-sm shadow-xl font-bold">
+          ${haven.icon || '🛡️'}
+        </div>
+      `;
+
+      const popup = new maplibregl.Popup({ offset: 25 }).setHTML(`
+        <div style="color: #111827; font-family: sans-serif; padding: 4px;">
+          <div style="font-weight: bold; font-size: 13px; margin-bottom: 2px;">${haven.name}</div>
+          <div style="font-size: 11px; color: #4b5563; margin-bottom: 6px;">${haven.address}</div>
+          <button id="set-dest-${haven.id}" style="background-color: #059669; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; width: 100%;">
+            🎯 Ustaw jako bezpieczny cel
+          </button>
+        </div>
+      `);
+
+      popup.on('open', () => {
+        const btn = document.getElementById(`set-dest-${haven.id}`);
+        if (btn) {
+          btn.onclick = () => {
+            setDestination([haven.lat, haven.lng]);
+            popup.remove();
+          };
+        }
+      });
+
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([haven.lng, haven.lat])
+        .setPopup(popup)
+        .addTo(mapRef.current);
+
+      havenMarkersRef.current.push(marker);
+    });
+  }, [safeHavens, mapLoaded]);
+
+  // Highlight active route
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return;
     const safeActive = activeRoute === 'safe';
@@ -195,18 +255,31 @@ export default function MapPage() {
 
       {/* Top bar */}
       <div className="absolute top-4 left-4 right-4 flex items-start justify-between pointer-events-none">
-        <div className="pointer-events-auto bg-gray-900/90 backdrop-blur rounded-2xl px-4 py-2.5 border border-gray-700 shadow-xl">
-          <div className="text-white font-bold text-sm">🛡️ Lumina</div>
+        <div className="pointer-events-auto bg-gray-900/90 backdrop-blur rounded-2xl px-4 py-2.5 border border-gray-700 shadow-xl space-y-0.5">
+          <div className="flex items-center gap-2">
+            <span className="text-white font-bold text-sm">🛡️ Lumina</span>
+            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+              deadManSettings.enabled
+                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                : 'bg-gray-800 text-gray-400'
+            }`}>
+              {deadManSettings.enabled ? '⚡ Dead Man: ON' : 'OFF'}
+            </span>
+          </div>
           {loadingRoute && (
-            <div className="text-blue-400 text-xs mt-0.5">Calculating safe route...</div>
+            <div className="text-blue-400 text-xs mt-0.5">Obliczanie bezpiecznej trasy...</div>
           )}
         </div>
 
         <button
-          onClick={() => router.push('/sos')}
-          className="pointer-events-auto w-14 h-14 bg-red-600 hover:bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-900/50 transition-all active:scale-95"
+          onClick={() => {
+            activateSOS('Manual');
+            router.push('/sos');
+          }}
+          className="pointer-events-auto w-14 h-14 bg-red-600 hover:bg-red-500 rounded-full flex flex-col items-center justify-center shadow-lg shadow-red-900/50 transition-all active:scale-95 border-2 border-red-400/50"
         >
-          <span className="text-white font-black text-sm">SOS</span>
+          <span className="text-white font-black text-sm leading-none">SOS</span>
+          <span className="text-[9px] text-red-200 font-bold tracking-tighter">({deadManSettings.manualCountdownSeconds}s)</span>
         </button>
       </div>
 
@@ -215,7 +288,7 @@ export default function MapPage() {
         <div className="absolute bottom-24 left-4 right-4 pointer-events-auto">
           <div className="bg-gray-900/95 backdrop-blur border border-gray-700 rounded-2xl p-4 shadow-2xl">
             <div className="text-[11px] text-gray-400 font-semibold uppercase tracking-widest mb-3">
-              Route Comparison
+              Porównanie Tras Nawigacji
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -230,9 +303,9 @@ export default function MapPage() {
               >
                 <div className="flex items-center gap-1.5 mb-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-500 flex-shrink-0" />
-                  <span className="text-white font-bold text-sm">Fast</span>
+                  <span className="text-white font-bold text-sm">Najszybsza</span>
                   {activeRoute === 'fast' && (
-                    <span className="ml-auto text-[10px] text-blue-400 font-semibold">ACTIVE</span>
+                    <span className="ml-auto text-[10px] text-blue-400 font-semibold">AKTYWNA</span>
                   )}
                 </div>
                 <div className="text-white text-xl font-bold leading-none">
@@ -244,10 +317,10 @@ export default function MapPage() {
                 <div className="mt-2">
                   {routeData.danger_reports_on_fastest > 0 ? (
                     <span className="text-red-400 text-xs">
-                      ⚠️ {routeData.danger_reports_on_fastest} danger zone{routeData.danger_reports_on_fastest > 1 ? 's' : ''}
+                      ⚠️ {routeData.danger_reports_on_fastest} stref niebezpiecznych
                     </span>
                   ) : (
-                    <span className="text-green-400 text-xs">✅ No danger</span>
+                    <span className="text-green-400 text-xs">✅ Bez zagrożeń</span>
                   )}
                 </div>
               </button>
@@ -263,9 +336,9 @@ export default function MapPage() {
               >
                 <div className="flex items-center gap-1.5 mb-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
-                  <span className="text-white font-bold text-sm">Safe</span>
+                  <span className="text-white font-bold text-sm">Bezpieczna</span>
                   {activeRoute === 'safe' && (
-                    <span className="ml-auto text-[10px] text-green-400 font-semibold">ACTIVE</span>
+                    <span className="ml-auto text-[10px] text-green-400 font-semibold">AKTYWNA</span>
                   )}
                 </div>
                 <div className="text-white text-xl font-bold leading-none">
@@ -287,10 +360,10 @@ export default function MapPage() {
                 <div className="mt-2">
                   {routeData.danger_reports_on_safest > 0 ? (
                     <span className="text-orange-400 text-xs">
-                      ⚠️ {routeData.danger_reports_on_safest} remaining
+                      ⚠️ {routeData.danger_reports_on_safest} pozostało
                     </span>
                   ) : (
-                    <span className="text-green-400 text-xs">✅ Danger free</span>
+                    <span className="text-green-400 text-xs">✅ Czysta trasa</span>
                   )}
                 </div>
               </button>
@@ -299,14 +372,14 @@ export default function MapPage() {
             {/* Detour explanation */}
             {hasDetour ? (
               <div className="mt-3 pt-3 border-t border-gray-700/60 text-xs">
-                <span className="text-gray-400">Safe route detours to avoid: </span>
+                <span className="text-gray-400">Bezpieczny objazd omija: </span>
                 <span className="text-amber-400 font-medium">
                   {routeData.avoided_categories.join(' · ')}
                 </span>
               </div>
             ) : (
               <div className="mt-3 pt-3 border-t border-gray-700/60 text-xs text-gray-500">
-                Both routes have similar safety based on current reports.
+                Obie trasy posiadają zbliżony poziom bezpieczeństwa.
               </div>
             )}
           </div>
@@ -316,45 +389,51 @@ export default function MapPage() {
       {/* Tap hint */}
       {!destination && (
         <div className="absolute bottom-28 left-1/2 -translate-x-1/2 bg-gray-900/80 backdrop-blur rounded-xl px-4 py-2 text-xs text-gray-400 whitespace-nowrap">
-          Tap anywhere on the map to set destination
+          Kliknij na mapę lub posterunek / dom, aby wyznaczyć cel
         </div>
       )}
 
       {/* Legend */}
-      <div className="absolute bottom-8 left-4 bg-gray-900/90 backdrop-blur rounded-xl p-3 border border-gray-700 text-xs space-y-1.5">
+      <div className="absolute bottom-8 left-4 bg-gray-900/90 backdrop-blur rounded-xl p-3 border border-gray-700 text-[11px] space-y-1">
         <div className="flex items-center gap-2">
-          <span className="w-4 h-1.5 bg-green-500 rounded" />
-          <span className="text-gray-300">Safe route</span>
+          <span className="w-3.5 h-1.5 bg-green-500 rounded" />
+          <span className="text-gray-300">Bezpieczna trasa</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-4 h-1" style={{ background: 'repeating-linear-gradient(to right,#3b82f6 0,#3b82f6 4px,transparent 4px,transparent 6px)' }} />
-          <span className="text-gray-300">Fast route</span>
+          <span className="w-3.5 h-1" style={{ background: 'repeating-linear-gradient(to right,#3b82f6 0,#3b82f6 4px,transparent 4px,transparent 6px)' }} />
+          <span className="text-gray-300">Najszybsza trasa</span>
+        </div>
+        <div className="flex items-center gap-2 pt-0.5">
+          <span>🚓</span>
+          <span className="text-blue-300 font-medium">Policja</span>
+          <span className="ml-1">🛡️</span>
+          <span className="text-emerald-300 font-medium">Safe Haven</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
-          <span className="text-gray-300">Suspicious</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-amber-500 inline-block" />
-          <span className="text-gray-300">Lighting</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-orange-500 inline-block" />
-          <span className="text-gray-300">Obstacle</span>
+          <span>🏠</span>
+          <span className="text-purple-300 font-medium">Mój Dom / Bliscy</span>
         </div>
       </div>
 
-      {/* Report danger button */}
-      <div className="absolute bottom-8 right-4">
+      {/* Action buttons (Report danger & Add Safe Haven) */}
+      <div className="absolute bottom-8 right-4 flex flex-col items-end gap-2">
+        <button
+          onClick={() => setAddHavenModalOpen(true)}
+          className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full px-4 py-2.5 font-semibold text-xs shadow-lg shadow-emerald-900/50 transition-all active:scale-95 flex items-center gap-1.5 border border-emerald-400/40"
+        >
+          <span>🏠 + Bezpieczne Miejsce</span>
+        </button>
+
         <button
           onClick={() => setReportModalOpen(true)}
-          className="bg-violet-600 hover:bg-violet-500 text-white rounded-full px-5 py-3 font-semibold shadow-lg shadow-violet-900/50 transition-all active:scale-95 flex items-center gap-2"
+          className="bg-violet-600 hover:bg-violet-500 text-white rounded-full px-4 py-2.5 font-semibold text-xs shadow-lg shadow-violet-900/50 transition-all active:scale-95 flex items-center gap-1.5"
         >
-          ⚠️ Report Danger
+          <span>⚠️ Zgłoś Zagrożenie</span>
         </button>
       </div>
 
       {reportModalOpen && <ReportModal />}
+      {addHavenModalOpen && <AddHavenModal />}
     </div>
   );
 }
