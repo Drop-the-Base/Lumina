@@ -32,7 +32,7 @@ export const api = {
 
   // Routing
   getRoute: (from: [number, number], to: [number, number]) =>
-    request<{ fastest: GeoJSON.Feature; safest: GeoJSON.Feature; danger_reports_on_fastest: number }>(
+    request<{ fastest: GeoJSON.Feature<GeoJSON.LineString>; safest: GeoJSON.Feature<GeoJSON.LineString>; danger_reports_on_fastest: number }>(
       '/api/route',
       {
         method: 'POST',

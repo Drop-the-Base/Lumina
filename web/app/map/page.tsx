@@ -44,7 +44,7 @@ export default function MapPage() {
   useEffect(() => {
     (async () => {
       const maplibreglModule = await import('maplibre-gl');
-      maplibregl = maplibreglModule.default || maplibreglModule;
+      maplibregl = (maplibreglModule as any).default || maplibreglModule;
       await import('maplibre-gl/dist/maplibre-gl.css' as any);
       
       // Point MapLibre to the ESM worker on unpkg to bypass Next.js Turbopack bundling bugs
