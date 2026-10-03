@@ -179,7 +179,7 @@ export default function MapPage() {
 
     safeHavens.forEach((haven) => {
       const el = document.createElement('div');
-      el.className = 'custom-haven-marker flex items-center justify-center cursor-pointer transform hover:scale-125 transition-transform';
+      el.className = 'custom-haven-marker flex items-center justify-center cursor-pointer';
       
       const badgeBg = haven.category === 'Police'
         ? 'bg-blue-600 border-blue-300'
@@ -190,7 +190,7 @@ export default function MapPage() {
         : 'bg-purple-600 border-purple-300';
 
       el.innerHTML = `
-        <div class="w-8 h-8 rounded-full ${badgeBg} border-2 text-white flex items-center justify-center text-sm shadow-xl font-bold">
+        <div class="w-8 h-8 rounded-full ${badgeBg} border-2 text-white flex items-center justify-center text-sm shadow-xl font-bold transform hover:scale-125 transition-transform origin-bottom">
           ${haven.icon || '🛡️'}
         </div>
       `;
@@ -259,11 +259,11 @@ export default function MapPage() {
           <div className="flex items-center gap-2">
             <span className="text-white font-bold text-sm">🛡️ Lumina</span>
             <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-              deadManSettings.enabled
+              deadManSettings?.enabled
                 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
                 : 'bg-gray-800 text-gray-400'
             }`}>
-              {deadManSettings.enabled ? '⚡ Dead Man: ON' : 'OFF'}
+              {deadManSettings?.enabled ? '⚡ Dead Man: ON' : 'OFF'}
             </span>
           </div>
           {loadingRoute && (
@@ -279,7 +279,7 @@ export default function MapPage() {
           className="pointer-events-auto w-14 h-14 bg-red-600 hover:bg-red-500 rounded-full flex flex-col items-center justify-center shadow-lg shadow-red-900/50 transition-all active:scale-95 border-2 border-red-400/50"
         >
           <span className="text-white font-black text-sm leading-none">SOS</span>
-          <span className="text-[9px] text-red-200 font-bold tracking-tighter">({deadManSettings.manualCountdownSeconds}s)</span>
+          <span className="text-[9px] text-red-200 font-bold tracking-tighter">({deadManSettings?.manualCountdownSeconds || 5}s)</span>
         </button>
       </div>
 
