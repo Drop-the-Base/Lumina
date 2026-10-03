@@ -129,7 +129,7 @@ export default function ReportsHistoryPage() {
           <div className="flex flex-wrap gap-1.5">
             {[
               { id: 'All', label: 'Wszystkie' },
-              { id: 'KMZB Police Import', label: '调度 KMZB Policja' },
+              { id: 'KMZB Police Import', label: '🚓 KMZB Policja' },
               { id: 'Lighting Issue', label: '💡 Oświetlenie' },
               { id: 'Suspicious Activity', label: '⚠️ Podejrzane' },
               { id: 'Obstacle', label: '🚧 Przeszkoda' },

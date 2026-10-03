@@ -296,7 +296,7 @@ export default function MapPage() {
   const hasDetour = routeData.avoided_categories.length > 0;
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-gray-950">
+    <div className="relative w-full h-full min-h-[600px] flex-1 overflow-hidden bg-gray-950">
       <div ref={mapContainer} className="w-full h-full" />
 
       {/* Top bar */}
