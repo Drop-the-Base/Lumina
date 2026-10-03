@@ -7,6 +7,7 @@ import { api, RouteResponse, lastStorageMode } from '@/lib/api';
 import { distanceToPolyline, offsetPoint, LngLat } from '@/lib/geo';
 import ReportModal from '@/components/ReportModal';
 import AddHavenModal from '@/components/AddHavenModal';
+import { renderWalkingPersonHTML, walkerDirection, WALK_CYCLE, type WalkerDirection } from '@/components/walkerFigure';
 
 let maplibregl: any;
 
@@ -96,103 +97,6 @@ function formatETA(durationSec: number): string {
   return `${hours}:${minutes}`;
 }
 
-const WALK_CYCLE: Record<number, string> = { 1: '0.8s', 2: '0.55s', 4: '0.38s' };
-
-// Side-profile walker with a real gait cycle (hip + knee joints, counter-swinging
-// arms, bobbing body). Animations live in globals.css under `.lw-*`; pausing
-// swaps `walking-active` for `walking-paused`, which shows a standing pose.
-function renderWalkingPersonHTML(isWalking: boolean, speed: number): string {
-  const duration = WALK_CYCLE[speed] ?? WALK_CYCLE[1];
-  const walkClass = isWalking ? 'walking-active' : 'walking-paused';
-
-  // translateY lifts the figure so her feet, not her waist, sit on the route point
-  return `
-  <div class="lw-root ${walkClass} pointer-events-none select-none" style="--walk-duration: ${duration}; transform: translateY(-36px); filter: drop-shadow(0 2px 3px rgba(15, 23, 42, 0.35));">
-    <svg viewBox="0 0 60 92" width="52" height="80" style="overflow:visible">
-      <defs>
-        <linearGradient id="lw-jacket" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#a855f7" />
-          <stop offset="1" stop-color="#ec4899" />
-        </linearGradient>
-        <linearGradient id="lw-hair" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#6b3a24" />
-          <stop offset="1" stop-color="#3b1d12" />
-        </linearGradient>
-      </defs>
-
-      <!-- ground -->
-      <ellipse class="lw-pulse" cx="30" cy="87" rx="14" ry="4.5" fill="none" stroke="#a78bfa" stroke-width="1.4" style="transform-origin:30px 87px" />
-      <ellipse class="lw-shadow" cx="30" cy="87" rx="11" ry="3" fill="#1e1b4b" opacity="0.35" />
-
-      <g class="lw-body">
-        <!-- far arm (behind body) -->
-        <g class="lw-arm-far">
-          <line x1="30" y1="33" x2="30" y2="42" stroke="#6d28d9" stroke-width="5" stroke-linecap="round" />
-          <g class="lw-fore-far">
-            <line x1="30" y1="42" x2="30" y2="49.5" stroke="#6d28d9" stroke-width="4.4" stroke-linecap="round" />
-            <circle cx="30" cy="51" r="2.2" fill="#e8b08f" />
-          </g>
-        </g>
-
-        <!-- far leg -->
-        <g class="lw-thigh-far">
-          <line x1="30" y1="52" x2="30" y2="65" stroke="#1e1b4b" stroke-width="7" stroke-linecap="round" />
-          <g class="lw-shin-far">
-            <line x1="30" y1="65" x2="30" y2="78" stroke="#1e1b4b" stroke-width="6" stroke-linecap="round" />
-            <path d="M26.6 77 h5.6 c3.6 0 5.2 1.6 5.4 4 v0.6 h-11 z" fill="#e5e7eb" />
-            <path d="M26.6 81.6 h11" stroke="#db2777" stroke-width="1.3" stroke-linecap="round" />
-          </g>
-        </g>
-
-        <!-- ponytail (behind head) -->
-        <g class="lw-pony">
-          <path d="M25 13.5 C18.5 12 15 17.5 16 24 C16.6 28.5 19.4 30.5 18.8 34 C22.6 31 23.6 26 23 21.5 C22.7 18.5 23.6 16.5 26 15.2 Z" fill="url(#lw-hair)" />
-        </g>
-
-        <!-- torso / jacket -->
-        <path d="M24.3 34 Q24.6 29.6 29 29.4 H32.4 Q37 29.6 37.2 34.5 L36.6 50.5 Q36.2 55 32 55 H28.4 Q24.4 55 24.3 50.5 Z" fill="url(#lw-jacket)" />
-        <path d="M33.5 30 L33 54.5" stroke="#fbcfe8" stroke-width="0.8" opacity="0.8" />
-        <path d="M24.6 51.5 H36.6" stroke="#831843" stroke-width="1.6" opacity="0.35" />
-
-        <!-- near leg -->
-        <g class="lw-thigh-near">
-          <line x1="30" y1="52" x2="30" y2="65" stroke="#312e81" stroke-width="7" stroke-linecap="round" />
-          <g class="lw-shin-near">
-            <line x1="30" y1="65" x2="30" y2="78" stroke="#312e81" stroke-width="6" stroke-linecap="round" />
-            <path d="M26.6 77 h5.6 c3.6 0 5.2 1.6 5.4 4 v0.6 h-11 z" fill="#ffffff" />
-            <path d="M26.6 81.6 h11" stroke="#ec4899" stroke-width="1.3" stroke-linecap="round" />
-          </g>
-        </g>
-
-        <!-- neck & head -->
-        <rect x="29" y="25" width="4" height="5.5" rx="1.5" fill="#e8b08f" />
-        <circle cx="32" cy="19" r="8.6" fill="#f6c7a6" />
-        <ellipse cx="29.4" cy="20" rx="1.4" ry="1.9" fill="#e8b08f" />
-        <!-- face (profile, looking right) -->
-        <ellipse cx="36" cy="18.6" rx="1.05" ry="1.45" fill="#1f2937" />
-        <circle cx="36.35" cy="18.1" r="0.35" fill="#ffffff" />
-        <path d="M35 16.6 Q36.2 15.9 37.4 16.5" stroke="#3b1d12" stroke-width="0.7" fill="none" stroke-linecap="round" />
-        <ellipse cx="35.6" cy="21.6" rx="1.6" ry="1" fill="#fb7185" opacity="0.45" />
-        <path d="M37.3 23.2 Q38.4 23.4 39 22.6" stroke="#be123c" stroke-width="0.75" fill="none" stroke-linecap="round" />
-        <!-- hair cap + bangs -->
-        <path d="M40.3 17.2 C40 10.2 34.6 7.6 29.6 8.9 C25 10.1 22.9 14.4 23.6 20.5 C24.6 23.8 27 23.4 27.7 20.6 C28.3 17.6 29.7 15.4 32.6 14.9 C35.6 14.4 38.4 15.6 40.3 17.2 Z" fill="url(#lw-hair)" />
-        <path d="M29.5 10.6 C32 9.6 35 9.9 37 11.4" stroke="#8b5a3c" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.8" />
-        <circle cx="25" cy="14.4" r="1.7" fill="#ec4899" />
-
-        <!-- near arm (in front of body) -->
-        <g class="lw-arm-near">
-          <line x1="30" y1="33" x2="30" y2="42" stroke="#9333ea" stroke-width="5" stroke-linecap="round" />
-          <g class="lw-fore-near">
-            <line x1="30" y1="42" x2="30" y2="49.5" stroke="#9333ea" stroke-width="4.4" stroke-linecap="round" />
-            <circle cx="30" cy="51" r="2.2" fill="#f6c7a6" />
-          </g>
-        </g>
-      </g>
-    </svg>
-  </div>
-  `;
-}
-
 export default function MapPage() {
   const router = useRouter();
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -236,6 +140,15 @@ export default function MapPage() {
   const [navCoordIndex, setNavCoordIndex] = useState(0);
   const [navStepIndex, setNavStepIndex] = useState(0);
   const [currentHeading, setCurrentHeading] = useState(0);
+  const headingRef = useRef(0);
+
+  // Show the walker's view that faces her heading relative to the camera
+  const updateWalkerDirection = () => {
+    const figure = userMarkerRef.current?.getElement()?.querySelector('.lw-root') as HTMLElement | null;
+    if (!figure || !mapRef.current) return;
+    const dir = walkerDirection(headingRef.current, mapRef.current.getBearing(), figure.dataset.dir as WalkerDirection);
+    if (figure.dataset.dir !== dir) figure.dataset.dir = dir;
+  };
   const [interpolatedCoords, setInterpolatedCoords] = useState<[number, number][]>([]);
   const [approachingDanger, setApproachingDanger] = useState<{
     category: string;
@@ -730,6 +643,7 @@ export default function MapPage() {
     const p2 = densified[Math.min(densified.length - 1, 2)];
     const bearing = calculateBearing(p1[1], p1[0], p2[1], p2[0]);
     setCurrentHeading(bearing);
+    headingRef.current = bearing;
     setUserLocation([p1[1], p1[0]]);
 
     mapRef.current?.easeTo({
@@ -810,6 +724,8 @@ export default function MapPage() {
           : routePt;
 
         setCurrentHeading(heading);
+        headingRef.current = heading;
+        updateWalkerDirection();
         setUserLocation([curPt[1], curPt[0]]);
 
         mapRef.current?.easeTo({
@@ -826,6 +742,16 @@ export default function MapPage() {
 
     return () => clearInterval(interval);
   }, [isNavigating, isWalking, hasArrived, interpolatedCoords, walkSpeed]);
+
+  // Camera rotation (easing after a turn, or the user rotating the map) changes
+  // which side of the walker faces the viewer
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!isNavigating || !map) return;
+    updateWalkerDirection();
+    map.on('rotate', updateWalkerDirection);
+    return () => map.off('rotate', updateWalkerDirection);
+  }, [isNavigating]);
 
   // Sync walking animation state (play / pause / speed) to marker without
   // recreating the SVG, so the running animation is never reset

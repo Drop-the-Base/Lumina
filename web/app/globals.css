@@ -34,7 +34,7 @@ body {
 .lw-root .lw-arm-near, .lw-root .lw-arm-far { transform-origin: 30px 33px; }
 .lw-root .lw-fore-near, .lw-root .lw-fore-far { transform-origin: 30px 42px; }
 .lw-root .lw-pony { transform-origin: 23px 15px; }
-.lw-root .lw-shadow { transform-origin: 30px 87px; transform-box: view-box; }
+.lw-root .lw-shadow { transform-origin: 30px 87px; }
 
 /* Standing pose (paused / arrived) */
 .lw-root .lw-thigh-near { transform: rotate(-4deg); }
@@ -100,4 +100,58 @@ body {
   100% { transform: scale(1.6); opacity: 0; }
 }
 .lw-pulse { animation: lw-pulse 1.8s ease-out infinite; }
+.lw-root .lw-pulse { transform-origin: 30px 87px; }
+
+/* ── View switching: she always faces her direction of travel ── */
+.lw-root .lw-view { display: none; overflow: visible; }
+.lw-root[data-dir="up"] .lw-view-back,
+.lw-root[data-dir="down"] .lw-view-front,
+.lw-root[data-dir="right"] .lw-view-side,
+.lw-root[data-dir="left"] .lw-view-side { display: block; }
+.lw-root[data-dir="left"] .lw-view-side { transform: scaleX(-1); }
+
+/* ── Back / front views: legs fold (foot lifts) during swing, arms swing
+   with foreshortening, hips sway over the stance leg, ponytail swings ── */
+.lw-root .lw-bleg-l { transform-origin: 26.5px 52px; }
+.lw-root .lw-bleg-r { transform-origin: 33.5px 52px; }
+.lw-root .lw-barm-l { transform-origin: 23.4px 33px; }
+.lw-root .lw-barm-r { transform-origin: 36.6px 33px; }
+.lw-root .lw-bbody { transform-origin: 30px 56px; }
+.lw-root .lw-view-back .lw-bpony { transform-origin: 30px 14.6px; }
+.lw-root .lw-view-front .lw-bpony { transform-origin: 37px 14px; }
+
+.walking-active .lw-bleg-l { animation: lw-bleg var(--walk-duration) linear infinite; }
+.walking-active .lw-bleg-r { animation: lw-bleg var(--walk-duration) linear infinite; animation-delay: calc(var(--walk-duration) * -0.5); }
+/* Each arm swings with the opposite leg */
+.walking-active .lw-barm-l { animation: lw-barm-l var(--walk-duration) ease-in-out infinite; animation-delay: calc(var(--walk-duration) * -0.5); }
+.walking-active .lw-barm-r { animation: lw-barm-r var(--walk-duration) ease-in-out infinite; }
+.walking-active .lw-bbody { animation: lw-sway var(--walk-duration) ease-in-out infinite; }
+.walking-active .lw-bpony { animation: lw-bpony var(--walk-duration) ease-in-out infinite; }
+
+/* 0–50% stance (full length), 50–100% swing: knee folds, foot rises */
+@keyframes lw-bleg {
+  0%, 46%  { transform: scaleY(1); }
+  62%      { transform: scaleY(0.76); }
+  80%      { transform: scaleY(0.86); }
+  96%, 100% { transform: scaleY(1); }
+}
+@keyframes lw-barm-l {
+  0%, 100% { transform: rotate(6deg) scaleY(1); }
+  50%      { transform: rotate(-2deg) scaleY(0.82); }
+}
+@keyframes lw-barm-r {
+  0%, 100% { transform: rotate(-6deg) scaleY(1); }
+  50%      { transform: rotate(2deg) scaleY(0.82); }
+}
+/* Weight shifts onto the left leg (0–50%) then the right; rises mid-stance */
+@keyframes lw-sway {
+  0%, 100% { transform: translate(-0.7px, 0.8px) rotate(-1.4deg); }
+  25%      { transform: translate(-0.9px, -1.2px) rotate(-0.6deg); }
+  50%      { transform: translate(0.7px, 0.8px) rotate(1.4deg); }
+  75%      { transform: translate(0.9px, -1.2px) rotate(0.6deg); }
+}
+@keyframes lw-bpony {
+  0%, 100% { transform: rotate(10deg); }
+  50%      { transform: rotate(-10deg); }
+}
 
