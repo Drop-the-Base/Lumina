@@ -28,6 +28,7 @@ export default function MapPage() {
   const destMarkerRef = useRef<any>(null);
   const havenMarkersRef = useRef<any[]>([]);
   const reportPopupRef = useRef<any>(null);
+  const sourcesReadyRef = useRef(false);
 
   const {
     reports, setReports,
@@ -44,6 +45,7 @@ export default function MapPage() {
 
   const [mapLoaded, setMapLoaded] = useState(false);
   const [loadingRoute, setLoadingRoute] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
 
   // Load MapLibre and init map
   useEffect(() => {
@@ -63,17 +65,13 @@ export default function MapPage() {
       });
 
       map.on('load', () => {
+        sourcesReadyRef.current = true;
         setMapLoaded(true);
 
         map.addSource('safe-route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        map.addSource('fast-route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addSource('reports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
-        // Both routes always visible; active one is thicker/brighter
-        map.addLayer({
-          id: 'fast-route-line', type: 'line', source: 'fast-route',
-          paint: { 'line-color': '#3b82f6', 'line-width': 3, 'line-opacity': 0.35, 'line-dasharray': [4, 2] },
-        });
+        // Only the safe route is shown on the map
         map.addLayer({
           id: 'safe-route-line', type: 'line', source: 'safe-route',
           paint: { 'line-color': '#22c55e', 'line-width': 6, 'line-opacity': 0.95 },
@@ -187,10 +185,25 @@ export default function MapPage() {
 
   // Sync route GeoJSON to map sources
   useEffect(() => {
-    if (!mapRef.current || !mapLoaded) return;
-    if (routeData.safest) mapRef.current.getSource('safe-route')?.setData(routeData.safest);
-    if (routeData.fastest) mapRef.current.getSource('fast-route')?.setData(routeData.fastest);
+    if (!mapRef.current || !sourcesReadyRef.current) return;
+    if (routeData.safest) {
+      mapRef.current.getSource('safe-route')?.setData(routeData.safest);
+      setShowPanel(true); // auto-show panel when new route arrives
+    }
   }, [routeData, mapLoaded]);
+
+  // Fetch initial route when map loads (destination may already be set in store)
+  useEffect(() => {
+    if (!mapLoaded) return;
+    const { destination: dest, userLocation: loc } = useAppStore.getState();
+    if (dest && loc) {
+      setLoadingRoute(true);
+      api.getRoute(loc, dest)
+        .then((data) => setRouteData(data))
+        .catch(console.error)
+        .finally(() => setLoadingRoute(false));
+    }
+  }, [mapLoaded]);
 
   // Sync markers (User + Destination)
   useEffect(() => {
@@ -329,109 +342,49 @@ export default function MapPage() {
         </button>
       </div>
 
-      {/* Route comparison panel */}
-      {hasRoutes && (
+      {/* Safe route info panel */}
+      {routeData.safest && showPanel && (
         <div className="absolute bottom-20 left-3 right-3 z-35 pointer-events-auto">
           <div className="bg-gray-900/95 backdrop-blur border border-gray-700 rounded-2xl p-3 shadow-2xl">
-            <div className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest mb-2 flex items-center justify-between">
-              <span>Porównanie Tras Nawigacji</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="text-white font-bold text-sm">Bezpieczna trasa</span>
+                {routeData.danger_reports_on_safest === 0 && (
+                  <span className="text-[10px] text-green-400 font-semibold bg-green-950/60 border border-green-800 px-1.5 py-0.5 rounded-full">✅ Czysta</span>
+                )}
+              </div>
               <button
-                onClick={() => setDestination(null)}
+                onClick={() => setShowPanel(false)}
                 className="text-[10px] text-gray-400 hover:text-white px-1.5 py-0.5 rounded bg-gray-800"
               >
                 ✕ Zamknij
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {/* Fast route card */}
-              <button
-                onClick={() => setActiveRoute('fast')}
-                className={`rounded-xl p-2.5 border text-left transition-all ${
-                  activeRoute === 'fast'
-                    ? 'border-blue-500 bg-blue-900/30'
-                    : 'border-gray-700 bg-gray-800/40 opacity-70'
-                }`}
-              >
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                  <span className="text-white font-bold text-xs">Najszybsza</span>
-                  {activeRoute === 'fast' && (
-                    <span className="ml-auto text-[9px] text-blue-400 font-semibold">AKTYWNA</span>
-                  )}
+            <div className="flex items-end gap-4">
+              <div>
+                <div className="text-white text-2xl font-bold leading-none">
+                  {formatMin(routeData.safest.properties?.duration_seconds || 0)}
                 </div>
-                <div className="text-white text-lg font-bold leading-none">
-                  {formatMin(routeData.fastest!.properties?.duration_seconds || 0)}
+                <div className="text-gray-400 text-xs mt-0.5">
+                  {formatKm(routeData.safest.properties?.distance_meters || 0)}
                 </div>
-                <div className="text-gray-400 text-[10px] mt-0.5">
-                  {formatKm(routeData.fastest!.properties?.distance_meters || 0)}
-                </div>
-                <div className="mt-1.5 text-[10px]">
-                  {routeData.danger_reports_on_fastest > 0 ? (
-                    <span className="text-red-400">
-                      ⚠️ {routeData.danger_reports_on_fastest} stref niebezpiecznych
-                    </span>
-                  ) : (
-                    <span className="text-green-400">✅ Bez zagrożeń</span>
-                  )}
-                </div>
-              </button>
+              </div>
 
-              {/* Safe route card */}
-              <button
-                onClick={() => setActiveRoute('safe')}
-                className={`rounded-xl p-2.5 border text-left transition-all ${
-                  activeRoute === 'safe'
-                    ? 'border-green-500 bg-green-900/30'
-                    : 'border-gray-700 bg-gray-800/40 opacity-70'
-                }`}
-              >
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                  <span className="text-white font-bold text-xs">Bezpieczna</span>
-                  {activeRoute === 'safe' && (
-                    <span className="ml-auto text-[9px] text-green-400 font-semibold">AKTYWNA</span>
-                  )}
+              {routeData.danger_reports_on_safest > 0 && (
+                <div className="text-orange-400 text-xs">
+                  ⚠️ {routeData.danger_reports_on_safest} zagrożeń na trasie
                 </div>
-                <div className="text-white text-lg font-bold leading-none">
-                  {formatMin(routeData.safest?.properties?.duration_seconds || 0)}
-                  {extraDuration > 30 && (
-                    <span className="text-gray-400 text-xs font-normal ml-1">
-                      +{Math.round(extraDuration / 60)}m
-                    </span>
-                  )}
-                </div>
-                <div className="text-gray-400 text-[10px] mt-0.5">
-                  {formatKm(routeData.safest?.properties?.distance_meters || 0)}
-                  {extraDistance > 50 && (
-                    <span className="text-gray-500 ml-1">
-                      (+{formatKm(extraDistance)})
-                    </span>
-                  )}
-                </div>
-                <div className="mt-1.5 text-[10px]">
-                  {routeData.danger_reports_on_safest > 0 ? (
-                    <span className="text-orange-400">
-                      ⚠️ {routeData.danger_reports_on_safest} pozostało
-                    </span>
-                  ) : (
-                    <span className="text-green-400">✅ Czysta trasa</span>
-                  )}
-                </div>
-              </button>
+              )}
             </div>
 
-            {/* Detour explanation */}
-            {hasDetour ? (
+            {hasDetour && (
               <div className="mt-2 pt-2 border-t border-gray-700/60 text-[10px]">
-                <span className="text-gray-400">Bezpieczny objazd omija: </span>
+                <span className="text-gray-400">Trasa omija: </span>
                 <span className="text-amber-400 font-medium">
                   {routeData.avoided_categories.join(' · ')}
                 </span>
-              </div>
-            ) : (
-              <div className="mt-2 pt-2 border-t border-gray-700/60 text-[10px] text-gray-500">
-                Obie trasy posiadają zbliżony poziom bezpieczeństwa.
               </div>
             )}
           </div>
