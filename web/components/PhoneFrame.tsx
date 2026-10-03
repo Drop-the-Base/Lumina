@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
 
 export default function PhoneFrame({ children }: { children: React.ReactNode }) {
   const [timeStr, setTimeStr] = useState('21:37');
@@ -19,7 +18,7 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <div className="w-full min-h-screen bg-gray-950 text-white flex flex-col md:flex-row items-center justify-center relative font-sans p-4 overflow-hidden">
+    <div className="w-full h-[100dvh] bg-gray-950 text-white flex flex-col md:flex-row items-center justify-center relative font-sans md:p-4 overflow-hidden">
       {/* Desktop presentation sidebar */}
       <div className="hidden md:flex flex-col items-start justify-center max-w-[300px] lg:max-w-sm z-20 absolute left-8 lg:left-[10%] xl:left-[15%]">
         <div className="flex items-center gap-3">
@@ -47,18 +46,13 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
         <div className="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-pink-600/10 rounded-full blur-[120px]" />
       </div>
 
-      {/* Smartphone Mockup Container */}
-      <div className="relative z-10 flex items-center justify-center">
-        {/* Phone Shell (desktop view) */}
-        <div className="hidden md:block relative w-[400px] h-[850px] max-h-[96vh] bg-gray-950 rounded-[50px] border-[12px] border-gray-900 shadow-[0_0_80px_rgba(124,58,237,0.25),0_25px_50px_-12px_rgba(0,0,0,0.95)] ring-1 ring-white/10 overflow-hidden transform-gpu">
-          
-          {/* Side Buttons (Visual decoration) */}
-          <div className="absolute -left-[16px] top-28 w-[4px] h-10 bg-gray-800 rounded-l-md" /> {/* Volume Up */}
-          <div className="absolute -left-[16px] top-42 w-[4px] h-10 bg-gray-800 rounded-l-md" /> {/* Volume Down */}
-          <div className="absolute -right-[16px] top-32 w-[4px] h-16 bg-gray-800 rounded-r-md" /> {/* Power Button */}
-
-          {/* Top Status Bar & Dynamic Island */}
-          <div className="absolute top-0 left-0 right-0 h-11 px-6 flex items-center justify-between text-[11px] font-semibold text-white/90 z-50 pointer-events-none select-none bg-gradient-to-b from-gray-950/90 to-transparent">
+      {/* Smartphone Mockup Container — children are rendered exactly once:
+          rendering them twice (desktop + mobile copy) mounted two maps,
+          two sensor engines and doubled every API call. */}
+      <div className="relative z-10 flex items-center justify-center w-full h-full md:w-auto md:h-auto">
+        <div className="relative w-full h-full md:w-[400px] md:h-[850px] md:max-h-[calc(100dvh-2rem)] bg-gray-950 md:rounded-[50px] md:border-[12px] md:border-gray-900 md:shadow-[0_0_80px_rgba(124,58,237,0.25),0_25px_50px_-12px_rgba(0,0,0,0.95)] md:ring-1 md:ring-white/10 overflow-hidden transform-gpu">
+          {/* Top Status Bar & Dynamic Island (desktop mockup only) */}
+          <div className="hidden md:flex absolute top-0 left-0 right-0 h-11 px-6 items-center justify-between text-[11px] font-semibold text-white/90 z-50 pointer-events-none select-none bg-gradient-to-b from-gray-950/90 to-transparent">
             {/* Clock */}
             <span>{timeStr}</span>
 
@@ -84,17 +78,12 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
           </div>
 
           {/* Inner Phone Screen Content */}
-          <div className="relative w-full h-full pt-10 overflow-hidden flex flex-col scrollbar-none transform-gpu rounded-[38px]">
+          <div className="relative w-full h-full md:pt-10 overflow-hidden flex flex-col scrollbar-none transform-gpu md:rounded-[38px]">
             {children}
           </div>
 
           {/* Bottom Home Indicator Pill */}
-          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/40 rounded-full z-50 pointer-events-none" />
-        </div>
-
-        {/* Native Mobile Display (For actual mobile viewports) */}
-        <div className="block md:hidden w-full min-h-screen">
-          {children}
+          <div className="hidden md:block absolute bottom-1 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/40 rounded-full z-50 pointer-events-none" />
         </div>
       </div>
     </div>

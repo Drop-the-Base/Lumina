@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAppStore } from '@/store/appStore';
-import { api } from '@/lib/api';
+import { api, lastStorageMode } from '@/lib/api';
 
 const CATEGORIES = [
   { id: 'Suspicious Activity', emoji: '🚨', label: 'Podejrzana aktywność', color: 'border-red-500 bg-red-900/30' },
@@ -11,38 +11,44 @@ const CATEGORIES = [
 ] as const;
 
 export default function ReportModal() {
-  const { setReportModalOpen, userLocation, userId, showToast, hideToast, addCommunityReport, setReports } = useAppStore();
+  const {
+    setReportModalOpen, userLocation, clickedLocation, userId,
+    showToast, hideToast, upsertReport, bumpRouteRefresh,
+  } = useAppStore();
   const [selected, setSelected] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Report the spot the user tapped on the map; fall back to her own position
+  const location: [number, number] = clickedLocation ?? userLocation ?? [50.0646, 19.9449];
 
   const handleSubmit = async () => {
     if (!selected) return;
     setLoading(true);
+    setErrorMsg(null);
 
     try {
-      await api.submitReport({
-        lat: userLocation?.[0] ?? 50.0646,
-        lng: userLocation?.[1] ?? 19.9449,
+      const saved = await api.submitReport({
+        lat: location[0],
+        lng: location[1],
         category: selected,
-        description,
+        description: description.trim() || undefined,
         author_id: userId,
       });
 
-      addCommunityReport({
-        category: selected as any,
-        description,
-        lat: userLocation?.[0] ?? 50.0646,
-        lng: userLocation?.[1] ?? 19.9449,
-      });
-
-
-
+      upsertReport(saved);
+      bumpRouteRefresh();
       setReportModalOpen(false);
-      showToast('Zgłoszono niebezpieczne miejsce!');
-      setTimeout(() => hideToast(), 3000);
-    } catch (err) {
+      showToast(
+        lastStorageMode === 'memory'
+          ? 'Zgłoszono — UWAGA: serwer bez bazy, zapis tymczasowy'
+          : 'Zgłoszono niebezpieczne miejsce!'
+      );
+      setTimeout(() => hideToast(), 3500);
+    } catch (err: any) {
       console.error(err);
+      setErrorMsg(err?.message || 'Nie udało się zapisać zgłoszenia. Spróbuj ponownie.');
     } finally {
       setLoading(false);
     }
@@ -89,10 +95,13 @@ export default function ReportModal() {
         />
 
         {/* Location */}
-        {userLocation && (
-          <p className="text-gray-500 text-xs text-center font-mono">
-            📍 {userLocation[0].toFixed(5)}, {userLocation[1].toFixed(5)}
-          </p>
+        <p className="text-gray-500 text-xs text-center">
+          📍 {clickedLocation ? 'Wskazany punkt na mapie' : 'Twoja lokalizacja'}:{' '}
+          <span className="font-mono">{location[0].toFixed(5)}, {location[1].toFixed(5)}</span>
+        </p>
+
+        {errorMsg && (
+          <p className="text-red-300 text-xs text-center bg-red-950/60 border border-red-800 rounded-xl p-2">{errorMsg}</p>
         )}
 
         {/* Submit */}

@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAppStore, SafeHaven } from '@/store/appStore';
-import { api, RouteResponse } from '@/lib/api';
-import { SensorEngine } from '@/lib/sensorEngine';
+import { useAppStore, Report } from '@/store/appStore';
+import { api, RouteResponse, lastStorageMode } from '@/lib/api';
+import { distanceToPolyline, offsetPoint, LngLat } from '@/lib/geo';
 import ReportModal from '@/components/ReportModal';
 import AddHavenModal from '@/components/AddHavenModal';
 
@@ -41,14 +41,28 @@ function calculateBearing(lat1: number, lng1: number, lat2: number, lng2: number
   return (brng + 360) % 360;
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!
+  ));
+}
+
 function getManeuverIcon(type?: string, modifier?: string): string {
   if (type === 'arrive') return '🎯';
   if (type === 'depart') return '🚶';
   if (type === 'roundabout' || type === 'rotary') return '🔄';
+  // "Continue" steps only follow a bend in the road — never show a hard turn arrow
+  if (type === 'continue' || type === 'new name') {
+    if (modifier?.includes('left')) return '↖️';
+    if (modifier?.includes('right')) return '↗️';
+    return '⬆️';
+  }
   if (modifier === 'sharp left') return '↰';
-  if (modifier === 'left' || modifier === 'slight left') return '⬅️';
+  if (modifier === 'slight left') return '↖️';
+  if (modifier === 'left') return '⬅️';
   if (modifier === 'sharp right') return '↱';
-  if (modifier === 'right' || modifier === 'slight right') return '➡️';
+  if (modifier === 'slight right') return '↗️';
+  if (modifier === 'right') return '➡️';
   if (modifier === 'uturn') return '↩️';
   return '⬆️';
 }
@@ -82,8 +96,10 @@ function formatETA(durationSec: number): string {
   return `${hours}:${minutes}`;
 }
 
+const WALK_CYCLE: Record<number, string> = { 1: '0.7s', 2: '0.45s', 4: '0.3s' };
+
 function renderWalkingPersonHTML(isWalking: boolean, speed: number): string {
-  const duration = speed === 4 ? '0.18s' : speed === 2 ? '0.28s' : '0.46s';
+  const duration = WALK_CYCLE[speed] ?? WALK_CYCLE[1];
   const walkClass = isWalking ? 'walking-active' : 'walking-paused';
 
   return `
@@ -178,7 +194,6 @@ export default function MapPage() {
   const router = useRouter();
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
-  const sensorRef = useRef<SensorEngine | null>(null);
   const userMarkerRef = useRef<any>(null);
   const destMarkerRef = useRef<any>(null);
   const havenMarkersRef = useRef<any[]>([]);
@@ -198,7 +213,12 @@ export default function MapPage() {
     destination, setDestination,
     clickedLocation, setClickedLocation,
     deadManSettings,
-    toastMessage,
+    toastMessage, showToast, hideToast,
+    upsertReport,
+    removeSafeHaven,
+    routeRefreshKey, bumpRouteRefresh,
+    raiseFlag, dangerFlags,
+    setNavigationActive,
   } = useAppStore();
 
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -220,6 +240,15 @@ export default function MapPage() {
     distanceMeters: number;
   } | null>(null);
   const [hasArrived, setHasArrived] = useState(false);
+  const [dangerDetailsOpen, setDangerDetailsOpen] = useState(false);
+  const stoppedSinceRef = useRef<number | null>(null);
+  const deviationFlaggedRef = useRef(false);
+  const deviationOffsetRef = useRef(0); // simulated sideways drift in meters (demo)
+
+  const flash = (msg: string) => {
+    showToast(msg);
+    setTimeout(() => hideToast(), 3500);
+  };
 
   // Initialize MapLibre
   useEffect(() => {
@@ -252,6 +281,23 @@ export default function MapPage() {
         map.addSource('reports', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
+        });
+
+        // Faster-but-riskier alternative, shown dashed when the safe route differs
+        map.addSource('fast-route', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        map.addLayer({
+          id: 'fast-route-line',
+          type: 'line',
+          source: 'fast-route',
+          paint: {
+            'line-color': '#9ca3af',
+            'line-width': 4,
+            'line-opacity': 0.8,
+            'line-dasharray': [1.5, 1.5],
+          },
         });
 
         // Layer for Route line (glow underneath)
@@ -305,39 +351,82 @@ export default function MapPage() {
           'Obstacle': { emoji: '🚧', color: '#f97316' },
         };
 
-        // Click on danger report circle
-        map.on('click', 'reports-circles', (e: any) => {
-          if (!e.features?.length) return;
-          const props = e.features[0].properties;
-          const coords = (e.features[0].geometry as any).coordinates.slice() as [number, number];
+        const showReportPopup = (props: any, coords: [number, number]) => {
           const meta = CATEGORY_META[props.category] ?? { emoji: '⚠️', color: '#6b7280' };
+          const { userId, votedReports } = useAppStore.getState();
 
           const diff = props.created_at ? Date.now() - new Date(props.created_at).getTime() : 0;
           const h = Math.floor(diff / 3600000);
           const m = Math.floor((diff % 3600000) / 60000);
-          const timeAgo = diff ? (h > 0 ? `${h}h temu` : `${m}m temu`) : '';
+          const timeAgo = diff ? (h > 24 ? `${Math.floor(h / 24)} d temu` : h > 0 ? `${h}h temu` : `${m}m temu`) : '';
+
+          const isOwn = props.author_id && props.author_id === userId;
+          const voted = votedReports[props.report_id];
+          const voteSection = isOwn
+            ? `<div style="font-size:11px;color:#6b7280;margin-top:8px;">To Twoje zgłoszenie — inni użytkownicy je zweryfikują.</div>`
+            : voted
+            ? `<div style="font-size:11px;color:#059669;font-weight:600;margin-top:8px;">${voted === 'confirm' ? '✔ Potwierdziłaś to zagrożenie' : '✖ Oznaczyłaś jako nieaktualne'}. Dziękujemy!</div>`
+            : `<div style="margin-top:8px;">
+                 <div style="font-size:11px;color:#374151;font-weight:600;margin-bottom:5px;">Czy to zagrożenie nadal tu jest?</div>
+                 <div style="display:flex;gap:6px;">
+                   <button data-vote="confirm" style="flex:1;background:#dc2626;color:#fff;border:none;padding:6px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;">👍 Potwierdzam</button>
+                   <button data-vote="deny" style="flex:1;background:#e5e7eb;color:#111827;border:none;padding:6px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;">👎 Nieaktualne</button>
+                 </div>
+               </div>`;
 
           reportPopupRef.current?.remove();
           destPopupRef.current?.remove();
 
-          reportPopupRef.current = new maplibregl.Popup({ offset: 16, maxWidth: '280px', closeButton: true })
+          const popup = new maplibregl.Popup({ offset: 16, maxWidth: '280px', closeButton: true })
             .setLngLat(coords)
             .setHTML(`
               <div style="font-family:sans-serif;padding:4px 0;">
                 <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;">
                   <span style="font-size:22px;line-height:1;">${meta.emoji}</span>
-                  <span style="font-weight:700;font-size:13px;color:${meta.color};">${props.category}</span>
+                  <span style="font-weight:700;font-size:13px;color:${meta.color};">${escapeHtml(props.category)}</span>
                 </div>
                 ${props.description
-                  ? `<div style="font-size:12px;color:#374151;margin-bottom:8px;line-height:1.45;">"${props.description}"</div>`
+                  ? `<div style="font-size:12px;color:#374151;margin-bottom:8px;line-height:1.45;">"${escapeHtml(props.description)}"</div>`
                   : ''}
                 <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:6px;">
-                  <span>👍 ${props.validation_count ?? 0} potwierdzeń</span>
+                  <span>👍 ${Number(props.validation_count) || 0} potwierdzeń</span>
                   ${timeAgo ? `<span>${timeAgo}</span>` : ''}
                 </div>
+                ${voteSection}
               </div>
             `)
             .addTo(map);
+          reportPopupRef.current = popup;
+
+          popup.getElement()?.querySelectorAll('button[data-vote]').forEach((btn: Element) => {
+            (btn as HTMLButtonElement).onclick = async () => {
+              const verdict = (btn as HTMLElement).dataset.vote as 'confirm' | 'deny';
+              popup.getElement()?.querySelectorAll('button[data-vote]').forEach((b: Element) => ((b as HTMLButtonElement).disabled = true));
+              const state = useAppStore.getState();
+              try {
+                const updated = await api.voteReport(props.report_id, state.userId, verdict);
+                state.markVoted(props.report_id, verdict);
+                state.upsertReport(updated);
+                state.bumpRouteRefresh();
+                state.showToast(updated.status === 'Resolved' ? 'Zgłoszenie zamknięte przez społeczność' : 'Dziękujemy za weryfikację!');
+                setTimeout(() => useAppStore.getState().hideToast(), 3000);
+                if (updated.status === 'Resolved') popup.remove();
+                else showReportPopup({ ...props, ...updated }, coords);
+              } catch (err: any) {
+                if (/już oceni/i.test(err?.message || '')) state.markVoted(props.report_id, verdict);
+                state.showToast(err?.message || 'Nie udało się zapisać głosu');
+                setTimeout(() => useAppStore.getState().hideToast(), 3500);
+                popup.getElement()?.querySelectorAll('button[data-vote]').forEach((b: Element) => ((b as HTMLButtonElement).disabled = false));
+              }
+            };
+          });
+        };
+
+        // Click on danger report circle
+        map.on('click', 'reports-circles', (e: any) => {
+          if (!e.features?.length) return;
+          const coords = (e.features[0].geometry as any).coordinates.slice() as [number, number];
+          showReportPopup(e.features[0].properties, coords);
         });
 
         map.on('mouseenter', 'reports-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
@@ -362,11 +451,6 @@ export default function MapPage() {
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, []);
-
-  // Set user start location (Kraków Main Station / Rynek area)
-  useEffect(() => {
-    setUserLocation([50.0646, 19.9449]);
   }, []);
 
   // Fetch Safe Havens from Database
@@ -448,13 +532,23 @@ export default function MapPage() {
           }
         }
       })
-      .catch((err) => console.error('Route calculation error:', err))
+      .catch((err) => {
+        console.error('Route calculation error:', err);
+        flash('Nie udało się wyznaczyć trasy — spróbuj ponownie');
+      })
       .finally(() => setLoadingRoute(false));
-  }, [destination]);
+    // Re-run when reports change (new report / community vote), not only on a new destination
+  }, [destination, routeRefreshKey]);
 
   // Update Route GeoJSON on map and adjust colors based on safety
   useEffect(() => {
     if (!mapRef.current || !sourcesReadyRef.current) return;
+    const fastGeom = JSON.stringify(routeData.fastest?.geometry ?? null);
+    const showFast = routeData.fastest && fastGeom !== JSON.stringify(routeData.safest?.geometry ?? null);
+    mapRef.current.getSource('fast-route')?.setData(
+      showFast && !isNavigating ? routeData.fastest : { type: 'FeatureCollection', features: [] }
+    );
+
     if (routeData.safest) {
       mapRef.current.getSource('safe-route')?.setData(routeData.safest);
 
@@ -468,7 +562,7 @@ export default function MapPage() {
     } else {
       mapRef.current.getSource('safe-route')?.setData({ type: 'FeatureCollection', features: [] });
     }
-  }, [routeData, mapLoaded]);
+  }, [routeData, mapLoaded, isNavigating]);
 
   // Sync markers for User and Destination
   useEffect(() => {
@@ -491,10 +585,13 @@ export default function MapPage() {
       } else {
         const el = userMarkerRef.current.getElement();
         if (isNavigating) {
+          // Build the SVG only once when entering navigation. Re-setting innerHTML on
+          // every position tick (every 400 ms) restarted the CSS walk cycle before it
+          // could finish, which made the figure stutter instead of walking.
           if (!el.classList.contains('custom-nav-marker')) {
             el.className = 'custom-nav-marker flex items-center justify-center';
+            el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed);
           }
-          el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed);
         } else {
           if (el.classList.contains('custom-nav-marker')) {
             el.className = 'w-7 h-7 rounded-full bg-emerald-500 border-3 border-white shadow-xl flex items-center justify-center text-[10px] text-white font-bold ring-4 ring-emerald-500/30 animate-pulse';
@@ -532,6 +629,8 @@ export default function MapPage() {
     havenMarkersRef.current = [];
 
     safeHavens.forEach((haven) => {
+      // Seeded official places (police, havens) start with sh_ and can't be removed
+      const isUserPlace = !haven.id.startsWith('sh_');
       const el = document.createElement('div');
       el.className = 'custom-haven-marker flex items-center justify-center cursor-pointer';
 
@@ -552,21 +651,40 @@ export default function MapPage() {
 
       const popup = new maplibregl.Popup({ offset: 25 }).setHTML(`
         <div style="color: #111827; font-family: sans-serif; padding: 4px; min-width: 170px;">
-          <div style="font-weight: bold; font-size: 13px; margin-bottom: 2px;">${haven.name}</div>
-          <div style="font-size: 11px; color: #4b5563; margin-bottom: 8px;">${haven.address}</div>
-          <button id="set-dest-${haven.id}" style="background-color: #059669; color: white; border: none; padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px;">
+          <div style="font-weight: bold; font-size: 13px; margin-bottom: 2px;">${escapeHtml(haven.name)}</div>
+          <div style="font-size: 11px; color: #4b5563; margin-bottom: 8px;">${escapeHtml(haven.address)}</div>
+          <button data-action="route" style="background-color: #059669; color: white; border: none; padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px;">
             <span>🎯 Wyznacz trasę tutaj</span>
           </button>
+          ${isUserPlace
+            ? `<button data-action="delete" style="margin-top: 6px; background-color: #f3f4f6; color: #b91c1c; border: none; padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; width: 100%;">🗑 Usuń z bazy</button>`
+            : ''}
         </div>
       `);
 
       popup.on('open', () => {
-        const btn = document.getElementById(`set-dest-${haven.id}`);
-        if (btn) {
-          btn.onclick = () => {
+        const root = popup.getElement();
+        const routeBtn = root?.querySelector('button[data-action="route"]') as HTMLButtonElement | null;
+        if (routeBtn) {
+          routeBtn.onclick = () => {
             setDestination([haven.lat, haven.lng]);
             setClickedLocation([haven.lat, haven.lng]);
             popup.remove();
+          };
+        }
+        const deleteBtn = root?.querySelector('button[data-action="delete"]') as HTMLButtonElement | null;
+        if (deleteBtn) {
+          deleteBtn.onclick = async () => {
+            deleteBtn.disabled = true;
+            try {
+              await api.deletePlace(haven.id);
+              removeSafeHaven(haven.id);
+              popup.remove();
+              flash('Usunięto miejsce z bazy');
+            } catch (err: any) {
+              deleteBtn.disabled = false;
+              flash(err?.message || 'Nie udało się usunąć miejsca');
+            }
           };
         }
       });
@@ -580,19 +698,12 @@ export default function MapPage() {
     });
   }, [safeHavens, mapLoaded]);
 
-  // Start sensor anomaly detection
-  useEffect(() => {
-    sensorRef.current = new SensorEngine((type) => {
-      activateSOS(type);
-      router.push('/sos');
-    });
-    sensorRef.current.start();
-    return () => sensorRef.current?.stop();
-  }, []);
-
   useEffect(() => {
     isNavigatingRef.current = isNavigating;
+    setNavigationActive(isNavigating);
   }, [isNavigating]);
+
+  useEffect(() => () => setNavigationActive(false), []);
 
   // Start Live Walking Navigation
   const handleStartNavigation = () => {
@@ -608,6 +719,9 @@ export default function MapPage() {
     setHasArrived(false);
     setIsNavigating(true);
     setIsWalking(true);
+    stoppedSinceRef.current = null;
+    deviationFlaggedRef.current = false;
+    deviationOffsetRef.current = 0;
 
     const p1 = densified[0];
     const p2 = densified[Math.min(densified.length - 1, 2)];
@@ -627,7 +741,7 @@ export default function MapPage() {
     const el = userMarkerRef.current?.getElement();
     if (el) {
       el.className = 'custom-nav-marker flex items-center justify-center';
-      el.innerHTML = renderWalkingPersonHTML(true, 1);
+      el.innerHTML = renderWalkingPersonHTML(true, walkSpeed);
     }
   };
 
@@ -637,6 +751,7 @@ export default function MapPage() {
     setIsWalking(false);
     setHasArrived(false);
     setApproachingDanger(null);
+    deviationOffsetRef.current = 0;
 
     const rawCoords = (routeData.safest?.geometry as any)?.coordinates;
     if (mapRef.current && rawCoords && rawCoords.length > 1) {
@@ -683,9 +798,13 @@ export default function MapPage() {
           return interpolatedCoords.length - 1;
         }
 
-        const curPt = interpolatedCoords[nextIndex];
+        const routePt = interpolatedCoords[nextIndex];
         const lookAhead = interpolatedCoords[Math.min(interpolatedCoords.length - 1, nextIndex + 2)];
-        const heading = calculateBearing(curPt[1], curPt[0], lookAhead[1], lookAhead[0]);
+        const heading = calculateBearing(routePt[1], routePt[0], lookAhead[1], lookAhead[0]);
+        // Demo: "simulate deviation" drifts the walker sideways off the route
+        const curPt = deviationOffsetRef.current
+          ? offsetPoint(routePt as LngLat, heading + 90, deviationOffsetRef.current)
+          : routePt;
 
         setCurrentHeading(heading);
         setUserLocation([curPt[1], curPt[0]]);
@@ -705,14 +824,80 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, [isNavigating, isWalking, hasArrived, interpolatedCoords, walkSpeed]);
 
-  // Sync walking animation state (play / pause / speed) to marker
+  // Sync walking animation state (play / pause / speed) to marker without
+  // recreating the SVG, so the running animation is never reset
   useEffect(() => {
     if (!isNavigating || !userMarkerRef.current) return;
-    const el = userMarkerRef.current.getElement();
-    if (el && el.classList.contains('custom-nav-marker')) {
-      el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed);
-    }
+    const figure = userMarkerRef.current.getElement()?.querySelector('.walking-active, .walking-paused') as HTMLElement | null;
+    if (!figure) return;
+    figure.classList.toggle('walking-active', isWalking);
+    figure.classList.toggle('walking-paused', !isWalking);
+    figure.style.setProperty('--walk-duration', WALK_CYCLE[walkSpeed] ?? WALK_CYCLE[1]);
   }, [isWalking, walkSpeed, isNavigating]);
+
+  // Dead Man's Switch: route deviation flag
+  useEffect(() => {
+    if (!isNavigating || !userLocation || !deadManSettings.enabled || !deadManSettings.detectRouteDeviation) return;
+    const line = (routeData.safest?.geometry as any)?.coordinates as LngLat[] | undefined;
+    if (!line || line.length < 2) return;
+
+    const { distance } = distanceToPolyline([userLocation[1], userLocation[0]], line);
+    if (distance > deadManSettings.deviationMeters && !deviationFlaggedRef.current) {
+      deviationFlaggedRef.current = true;
+      raiseFlag('GPS_Deviation', `Zboczenie z trasy o ${Math.round(distance)} m`);
+    } else if (distance <= deadManSettings.deviationMeters) {
+      deviationFlaggedRef.current = false;
+    }
+  }, [userLocation, isNavigating, routeData, deadManSettings]);
+
+  // Dead Man's Switch: standing still in a dark spot for too long
+  useEffect(() => {
+    if (!isNavigating || hasArrived || isWalking || !deadManSettings.enabled || !deadManSettings.detectDarkStop) {
+      stoppedSinceRef.current = null;
+      return;
+    }
+    stoppedSinceRef.current ??= Date.now();
+    const check = setInterval(() => {
+      const loc = useAppStore.getState().userLocation;
+      if (!loc || stoppedSinceRef.current === null) return;
+      if (Date.now() - stoppedSinceRef.current < deadManSettings.stopMinutes * 60_000) return;
+
+      const hour = new Date().getHours();
+      const nearDarkReport = useAppStore.getState().reports.some(
+        (r) => r.category === 'Lighting Issue' && distanceInMeters(loc[0], loc[1], r.lat, r.lng) < 150
+      );
+      const routeMostlyDark = (routeData.lighting?.safest_lit_ratio ?? 1) < 0.6;
+      if (nearDarkReport || routeMostlyDark || hour >= 20 || hour < 6) {
+        raiseFlag('Timeout', `Brak ruchu od ${deadManSettings.stopMinutes} min w ciemnym miejscu`);
+        stoppedSinceRef.current = null;
+      }
+    }, 5000);
+    return () => clearInterval(check);
+  }, [isNavigating, isWalking, hasArrived, deadManSettings, routeData]);
+
+  // Demo helpers: fire the real detectors without a phone in the pocket
+  const simulateRun = () => {
+    if (!deadManSettings.enabled || !deadManSettings.detectRun) {
+      flash('Detekcja biegu jest wyłączona w ustawieniach Dead Man');
+      return;
+    }
+    for (let i = 0; i < 12; i++) {
+      const g = i % 2 ? 2 : 24;
+      window.dispatchEvent(
+        new DeviceMotionEvent('devicemotion', { accelerationIncludingGravity: { x: g, y: g / 2, z: 9.8 } })
+      );
+    }
+  };
+
+  const simulateDeviation = () => {
+    if (!deadManSettings.enabled || !deadManSettings.detectRouteDeviation) {
+      flash('Detekcja zboczenia z trasy jest wyłączona w ustawieniach Dead Man');
+      return;
+    }
+    deviationOffsetRef.current = deadManSettings.deviationMeters + 40;
+    if (!isWalking) setIsWalking(true);
+    setTimeout(() => (deviationOffsetRef.current = 0), 6000);
+  };
 
   const steps = routeData.steps || [];
   const currentStep = steps[navStepIndex] || steps[0];
@@ -800,7 +985,7 @@ export default function MapPage() {
     : 0;
 
   return (
-    <div className="relative w-full h-full min-h-[600px] flex-1 overflow-hidden bg-gray-950">
+    <div className="relative w-full h-full flex-1 overflow-hidden bg-gray-950">
       <div ref={mapContainer} className="w-full h-full" />
 
       {/* Top Bar: Standard Mode vs Active Navigation Mode */}
@@ -849,7 +1034,7 @@ export default function MapPage() {
       ) : (
         /* Top Navigation Turn HUD */
         <div className="absolute top-4 left-3 right-3 flex items-start justify-between gap-2.5 z-40 pointer-events-none">
-          <div className="pointer-events-auto flex-1 bg-gray-950/95 border-2 border-emerald-500/80 rounded-2xl p-3.5 shadow-2xl backdrop-blur flex items-center gap-3">
+          <div className="pointer-events-auto flex-1 min-w-0 bg-gray-950/95 border-2 border-emerald-500/80 rounded-2xl p-3.5 shadow-2xl backdrop-blur flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-emerald-600/30 border border-emerald-400 flex items-center justify-center text-2xl flex-shrink-0 shadow-inner">
               {getManeuverIcon(currentStep?.type, currentStep?.modifier)}
             </div>
@@ -937,7 +1122,7 @@ export default function MapPage() {
                     isSafe ? 'text-emerald-400' : 'text-red-400'
                   }`}
                 >
-                  {isSafe ? '🛡️ TRASA JEST BEZPIECZNA' : '⚠️ TRASA JEST NIEBEZPIECZNA'}
+                  {isSafe ? '🛡️ TRASA BEZPIECZNA' : '⚠️ TRASA Z ZAGROŻENIAMI'}
                 </h3>
               </div>
 
@@ -962,16 +1147,39 @@ export default function MapPage() {
             </div>
 
             {/* Safety Assessment Description */}
-            <div className="text-xs mb-3 text-gray-300 leading-snug">
+            <div className="text-xs mb-3 text-gray-300 leading-snug space-y-1.5">
+              {(routeData.avoided_count ?? 0) > 0 && (
+                <p className="text-emerald-300 font-semibold">
+                  🛡️ Ominięto {routeData.avoided_count} {routeData.avoided_count === 1 ? 'zagrożenie' : 'zagrożenia'}
+                  {routeData.extra_duration_seconds > 30 ? ` (+${formatMin(routeData.extra_duration_seconds)})` : ''}
+                  <span className="text-gray-400 font-normal"> · szybsza trasa przerywaną linią</span>
+                </p>
+              )}
+              {routeData.lighting && (
+                <p className="text-amber-200/90">
+                  💡 Oświetlenie: {Math.round(routeData.lighting.safest_lit_ratio * 100)}% trasy
+                  {routeData.lighting.safest_unlit_meters > 0
+                    ? ` · ${formatKm(routeData.lighting.safest_unlit_meters)} nieoświetlone`
+                    : ''}
+                </p>
+              )}
+              {routeData.fallback && (
+                <p className="text-amber-300">⚠️ Serwer tras niedostępny — pokazano linię prostą.</p>
+              )}
               {isSafe ? (
                 <p className="text-emerald-200/90 font-medium">
-                  ✅ Na tej trasie nie wykryto żadnych zgłoszonych zagrożeń ani nieoświetlonych zaułków. Droga jest bezpieczna do powrotu.
+                  ✅ Na tej trasie nie ma aktywnych zgłoszeń zagrożeń.
                 </p>
               ) : (
                 <div className="space-y-1.5">
-                  <p className="text-red-300 font-semibold">
-                    🚨 Uwaga! W pobliżu tej trasy znajdują się aktywne punkty ostrzegawcze:
-                  </p>
+                  <button
+                    onClick={() => setDangerDetailsOpen((v) => !v)}
+                    className="text-red-300 font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    🚨 Nie da się ominąć {dangerCount} {dangerCount === 1 ? 'zgłoszenia' : 'zgłoszeń'} na trasie
+                    <span className="text-gray-400 text-[10px]">{dangerDetailsOpen ? '▲ ukryj' : '▼ szczegóły'}</span>
+                  </button>
+                  {dangerDetailsOpen && (<>
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {dangers.length > 0 ? (
                       dangers.map((d, idx) => (
@@ -996,8 +1204,9 @@ export default function MapPage() {
                     )}
                   </div>
                   <p className="text-[11px] text-amber-300/90 pt-1">
-                    💡 Zalecamy ominięcie tego obszaru lub udanie się do najbliższego punktu schronienia (Safe Haven).
+                    💡 Zachowaj czujność w tych miejscach lub wybierz najbliższy punkt schronienia (Safe Haven).
                   </p>
+                  </>)}
                 </div>
               )}
             </div>
@@ -1045,7 +1254,7 @@ export default function MapPage() {
 
       {/* ACTIVE NAVIGATION BOTTOM CONTROL PANEL */}
       {isNavigating && (
-        <div className="absolute bottom-4 left-3 right-3 z-40 pointer-events-auto animate-slide-up">
+        <div className="absolute bottom-5 left-3 right-3 z-40 pointer-events-auto animate-slide-up">
           <div className="bg-gray-950/95 border-2 border-emerald-500/80 rounded-2xl p-4 shadow-2xl backdrop-blur ring-1 ring-emerald-500/30">
             {/* Walk Progress Bar */}
             <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden mb-3">
@@ -1098,6 +1307,41 @@ export default function MapPage() {
               </div>
             </div>
 
+            {/* Dead Man's Switch status & demo triggers */}
+            {deadManSettings.enabled && (
+              <div className="mt-3 pt-3 border-t border-gray-800 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-gray-400 font-semibold">⚡ Dead Man&apos;s Switch</span>
+                  <span className={`font-black ${dangerFlags.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    Flagi: {dangerFlags.length}/{deadManSettings.requiredFlags}
+                  </span>
+                </div>
+                {dangerFlags.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {dangerFlags.map((f) => (
+                      <span key={f.type} className="text-[10px] px-2 py-0.5 rounded-lg bg-amber-950/80 border border-amber-700/70 text-amber-200">
+                        {f.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={simulateRun}
+                    className="flex-1 py-1.5 rounded-lg bg-gray-900 border border-gray-700 text-[10px] font-bold text-gray-300 hover:text-white cursor-pointer"
+                  >
+                    🧪 Symuluj bieg
+                  </button>
+                  <button
+                    onClick={simulateDeviation}
+                    className="flex-1 py-1.5 rounded-lg bg-gray-900 border border-gray-700 text-[10px] font-bold text-gray-300 hover:text-white cursor-pointer"
+                  >
+                    🧪 Symuluj zboczenie
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Cancel Navigation Button */}
             <button
               onClick={handleStopNavigation}
@@ -1145,7 +1389,7 @@ export default function MapPage() {
 
       {/* Tap hint when no destination is selected */}
       {!destination && !isNavigating && (
-        <div className="absolute bottom-40 left-1/2 -translate-x-1/2 bg-gray-900/90 border border-gray-700 backdrop-blur rounded-xl px-3.5 py-2 text-[11px] text-gray-200 font-semibold whitespace-nowrap z-30 shadow-xl flex items-center gap-2">
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-gray-900/90 border border-gray-700 backdrop-blur rounded-xl px-3.5 py-2 text-[11px] text-gray-200 font-semibold whitespace-nowrap z-30 shadow-xl flex items-center gap-2">
           <span>📍</span>
           <span>Kliknij dowolne miejsce na mapie, aby wyznaczyć trasę</span>
         </div>
@@ -1153,7 +1397,9 @@ export default function MapPage() {
 
       {/* Floating Action Buttons (hidden during active navigation) */}
       {!isNavigating && (
-        <div className={`absolute ${routeData.safest && showWidget ? 'bottom-72' : 'bottom-20'} right-3 flex flex-col items-end gap-2.5 z-30 transition-all`}>
+        // With the route widget open there is no fixed free space above it (its height
+        // varies), so the actions move under the SOS button instead of hiding behind it
+        <div className={`absolute ${routeData.safest && showWidget ? 'top-24' : 'bottom-20'} right-3 flex flex-col items-end gap-2.5 z-30 transition-all`}>
           <button
             onClick={() => {
               setClickedLocation(destination || userLocation || [50.0646, 19.9449]);

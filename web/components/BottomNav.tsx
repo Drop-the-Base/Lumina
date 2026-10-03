@@ -6,10 +6,11 @@ import { useAppStore } from '@/store/appStore';
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const { sosActive, deadManSettings } = useAppStore();
+  const { deadManSettings, navigationActive, trustedContacts } = useAppStore();
 
-  // Hide bottom nav on full screen SOS countdown page
-  if (pathname === '/sos') return null;
+  // Hide on the full screen SOS page and during turn-by-turn navigation,
+  // where it covered the progress panel and the "end navigation" button
+  if (pathname === '/sos' || (pathname === '/map' && navigationActive)) return null;
 
   const navItems = [
     {
@@ -29,7 +30,7 @@ export default function BottomNav() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
         </svg>
       ),
-      badge: '2',
+      badge: trustedContacts.length > 0 ? String(trustedContacts.length) : undefined,
     },
     {
       href: '/settings',

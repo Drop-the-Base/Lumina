@@ -158,7 +158,7 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5 pr-2">
             <div className="text-sm font-bold text-white flex items-center gap-1.5">
-              <span>🔋 Niski poziom baterii (&lt;5%)</span>
+              <span>🔋 Niski poziom baterii (&lt;15%)</span>
             </div>
             <p className="text-xs text-gray-400">
               Ostrzeżenie zaufanych kontaktów przed wyłączeniem telefonu.

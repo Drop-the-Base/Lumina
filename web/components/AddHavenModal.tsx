@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import { useAppStore, SafeHaven } from '@/store/appStore';
-import { api } from '@/lib/api';
+import { api, lastStorageMode } from '@/lib/api';
 
 export default function AddHavenModal() {
   const {
     setAddHavenModalOpen,
     addSafeHaven,
     userLocation,
+    userId,
     clickedLocation,
     setClickedLocation,
     showToast,
@@ -45,13 +46,18 @@ export default function AddHavenModal() {
         lat: activeCoord[0],
         lng: activeCoord[1],
         icon: iconMap[category],
+        owner_id: userId,
       });
 
       addSafeHaven(savedPlace);
       setClickedLocation(null);
       setAddHavenModalOpen(false);
-      showToast('Zapisano bezpieczne miejsce w bazie!');
-      setTimeout(() => hideToast(), 3000);
+      showToast(
+        lastStorageMode === 'memory'
+          ? 'Zapisano — UWAGA: serwer bez bazy, zapis tymczasowy'
+          : 'Zapisano bezpieczne miejsce w bazie!'
+      );
+      setTimeout(() => hideToast(), 3500);
     } catch (err: any) {
       console.error('Failed to save place to database:', err);
       setErrorMsg(err.message || 'Wystąpił błąd podczas zapisywania miejsca w bazie.');

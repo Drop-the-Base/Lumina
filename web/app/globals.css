@@ -27,20 +27,20 @@ body {
 }
 
 /* Lumina Front-Facing Walking Woman Animations */
+/* Front-facing walk: legs swing from the hip in opposite phase and the
+   stepping leg shortens (knee lift seen from the front). */
 @keyframes woman-walk-leg-left {
-  0% { transform: translateY(0px) scaleY(1); }
-  25% { transform: translateY(-4px) scaleY(0.92); }
-  50% { transform: translateY(2.5px) scaleY(1.05); }
-  75% { transform: translateY(-2px) scaleY(0.96); }
-  100% { transform: translateY(0px) scaleY(1); }
+  0%, 100% { transform: rotate(7deg) translateY(0px) scaleY(1); }
+  25% { transform: rotate(0deg) translateY(-3px) scaleY(0.9); }
+  50% { transform: rotate(-7deg) translateY(0px) scaleY(1); }
+  75% { transform: rotate(0deg) translateY(0.5px) scaleY(1.02); }
 }
 
 @keyframes woman-walk-leg-right {
-  0% { transform: translateY(2.5px) scaleY(1.05); }
-  25% { transform: translateY(-2px) scaleY(0.96); }
-  50% { transform: translateY(0px) scaleY(1); }
-  75% { transform: translateY(-4px) scaleY(0.92); }
-  100% { transform: translateY(2.5px) scaleY(1.05); }
+  0%, 100% { transform: rotate(-7deg) translateY(0px) scaleY(1); }
+  25% { transform: rotate(0deg) translateY(0.5px) scaleY(1.02); }
+  50% { transform: rotate(7deg) translateY(0px) scaleY(1); }
+  75% { transform: rotate(0deg) translateY(-3px) scaleY(0.9); }
 }
 
 @keyframes woman-walk-arm-left {
@@ -55,9 +55,11 @@ body {
   100% { transform: rotate(16deg); }
 }
 
+/* One bob per step: two steps (25% and 75%) per leg cycle */
 @keyframes woman-walk-body {
-  0%, 100% { transform: translateY(0px) rotate(-1.5deg); }
-  50% { transform: translateY(-2.5px) rotate(1.5deg); }
+  0%, 50%, 100% { transform: translateY(0px) rotate(0deg); }
+  25% { transform: translateY(-2.5px) rotate(-1.5deg); }
+  75% { transform: translateY(-2.5px) rotate(1.5deg); }
 }
 
 @keyframes woman-walk-hair {
@@ -77,22 +79,22 @@ body {
 }
 
 .walking-active .woman-leg-left {
-  animation: woman-walk-leg-left var(--walk-duration, 0.46s) infinite ease-in-out;
+  animation: woman-walk-leg-left var(--walk-duration, 0.7s) infinite ease-in-out;
 }
 .walking-active .woman-leg-right {
-  animation: woman-walk-leg-right var(--walk-duration, 0.46s) infinite ease-in-out;
+  animation: woman-walk-leg-right var(--walk-duration, 0.7s) infinite ease-in-out;
 }
 .walking-active .woman-arm-left {
-  animation: woman-walk-arm-left var(--walk-duration, 0.46s) infinite alternate ease-in-out;
+  animation: woman-walk-arm-left var(--walk-duration, 0.7s) infinite ease-in-out;
 }
 .walking-active .woman-arm-right {
-  animation: woman-walk-arm-right var(--walk-duration, 0.46s) infinite alternate ease-in-out;
+  animation: woman-walk-arm-right var(--walk-duration, 0.7s) infinite ease-in-out;
 }
 .walking-active .woman-body-group {
-  animation: woman-walk-body var(--walk-duration, 0.46s) infinite alternate ease-in-out;
+  animation: woman-walk-body var(--walk-duration, 0.7s) infinite ease-in-out;
 }
 .walking-active .woman-hair-sway {
-  animation: woman-hair-sway var(--walk-duration, 0.46s) infinite alternate ease-in-out;
+  animation: woman-walk-hair var(--walk-duration, 0.7s) infinite alternate ease-in-out;
 }
 
 .walking-paused .woman-leg-left,

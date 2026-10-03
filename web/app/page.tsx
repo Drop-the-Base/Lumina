@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default function Home() {
   return (
-    <main className="h-full overflow-y-auto bg-gray-950 text-white flex flex-col items-center justify-center px-6 py-4 scrollbar-none">
+    <main className="h-full overflow-y-auto bg-gray-950 text-white flex flex-col items-center px-6 pt-4 pb-28 scrollbar-none">
       <div className="max-w-sm w-full text-center space-y-6 my-auto">
         {/* Logo & Icon */}
         <div className="space-y-3">

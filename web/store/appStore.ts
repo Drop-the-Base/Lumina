@@ -1,9 +1,11 @@
 'use client';
 
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export interface Report {
   report_id: string;
+  author_id?: string;
   category: 'Suspicious Activity' | 'Lighting Issue' | 'Obstacle' | 'KMZB Police Import';
   description?: string;
   validation_count: number;
@@ -32,6 +34,7 @@ export interface RouteData {
   danger_reports_on_fastest: number;
   danger_reports_on_safest: number;
   dangers_on_route?: Array<{
+    report_id?: string;
     category: string;
     description?: string;
     lat: number;
@@ -40,7 +43,23 @@ export interface RouteData {
   extra_distance_meters: number;
   extra_duration_seconds: number;
   avoided_categories: string[];
+  avoided_count?: number;
+  lighting?: {
+    safest_lit_ratio: number;
+    safest_unlit_meters: number;
+    fastest_lit_ratio: number;
+    fastest_unlit_meters: number;
+  };
+  fallback?: boolean;
   steps?: RouteStep[];
+}
+
+export type DangerFlagType = 'Accelerometer' | 'GPS_Deviation' | 'Timeout' | 'LowBattery';
+
+export interface DangerFlag {
+  type: DangerFlagType;
+  label: string;
+  at: number;
 }
 
 export interface TrustedContact {
@@ -94,6 +113,15 @@ interface AppState {
   // SOS
   sosActive: boolean;
   sosTriggerType: string;
+  sosFlags: DangerFlag[];
+
+  // Dead Man's Switch flags raised during the current walk
+  dangerFlags: DangerFlag[];
+  navigationActive: boolean;
+
+  // Bumped whenever reports change so the route is re-evaluated
+  routeRefreshKey: number;
+  votedReports: Record<string, 'confirm' | 'deny'>;
 
   // UI
   reportModalOpen: boolean;
@@ -117,7 +145,7 @@ interface AppState {
   setRouteData: (data: RouteData) => void;
   setActiveRoute: (route: 'safe' | 'fast') => void;
   toggleRoute: () => void;
-  activateSOS: (triggerType: string) => void;
+  activateSOS: (triggerType: string, flags?: DangerFlag[]) => void;
   dismissSOS: () => void;
   setReportModalOpen: (open: boolean) => void;
   setAddHavenModalOpen: (open: boolean) => void;
@@ -133,9 +161,15 @@ interface AppState {
   // Dead man actions
   updateDeadManSettings: (settings: Partial<DeadManSettings>) => void;
 
+  // Dead man flags
+  raiseFlag: (type: DangerFlagType, label: string) => void;
+  clearFlags: () => void;
+  setNavigationActive: (active: boolean) => void;
+
   // Report & Haven actions
-  voteReport: (reportId: string, isPositive: boolean) => void;
-  addCommunityReport: (report: Omit<Report, 'report_id' | 'created_at' | 'validation_count' | 'status'>) => void;
+  upsertReport: (report: Report) => void;
+  markVoted: (reportId: string, verdict: 'confirm' | 'deny') => void;
+  bumpRouteRefresh: () => void;
   addSafeHaven: (haven: SafeHaven | Omit<SafeHaven, 'id'>) => void;
   removeSafeHaven: (id: string) => void;
 }
@@ -250,9 +284,18 @@ const DEFAULT_DEADMAN_SETTINGS: DeadManSettings = {
   manualCountdownSeconds: 5,
 };
 
-export const useAppStore = create<AppState>((set) => ({
-  userId: '11111111-1111-1111-1111-111111111111', // Demo user ID
-  userLocation: [50.054, 19.935], // Wawel Castle
+const FLAG_TTL_MS = 5 * 60 * 1000;
+
+// Anonymous per-device identity for the reputation system. Seed reports belong
+// to the demo users, so using a fixed demo id here would make every vote a self-vote.
+function newUserId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
+}
+
+export const useAppStore = create<AppState>()(persist((set) => ({
+  userId: newUserId(),
+  userLocation: [50.0646, 19.9449], // Kraków Główny — the route start and the marker must agree
   destination: [50.061, 19.937],  // Main Square
   clickedLocation: null,
   reports: [],
@@ -261,6 +304,11 @@ export const useAppStore = create<AppState>((set) => ({
   activeRoute: 'safe',
   sosActive: false,
   sosTriggerType: 'Manual',
+  sosFlags: [],
+  dangerFlags: [],
+  navigationActive: false,
+  routeRefreshKey: 0,
+  votedReports: {},
   reportModalOpen: false,
   addHavenModalOpen: false,
   toastMessage: null,
@@ -279,8 +327,8 @@ export const useAppStore = create<AppState>((set) => ({
   setRouteData: (routeData) => set({ routeData }),
   setActiveRoute: (activeRoute) => set({ activeRoute }),
   toggleRoute: () => set((s) => ({ activeRoute: s.activeRoute === 'safe' ? 'fast' : 'safe' })),
-  activateSOS: (triggerType) => set({ sosActive: true, sosTriggerType: triggerType }),
-  dismissSOS: () => set({ sosActive: false }),
+  activateSOS: (triggerType, flags = []) => set({ sosActive: true, sosTriggerType: triggerType, sosFlags: flags }),
+  dismissSOS: () => set({ sosActive: false, sosFlags: [], dangerFlags: [] }),
   setReportModalOpen: (open) => set({ reportModalOpen: open }),
   setAddHavenModalOpen: (open) => set({ addHavenModalOpen: open }),
   showToast: (msg) => set({ toastMessage: msg }),
@@ -307,29 +355,25 @@ export const useAppStore = create<AppState>((set) => ({
       deadManSettings: { ...s.deadManSettings, ...newSettings },
     })),
 
-  voteReport: (reportId, isPositive) =>
-    set((s) => ({
-      reports: s.reports.map((r) =>
-        r.report_id === reportId
-          ? { ...r, validation_count: r.validation_count + (isPositive ? 1 : -1) }
-          : r
-      ),
-    })),
-
-  addCommunityReport: (reportData) =>
+  raiseFlag: (type, label) =>
     set((s) => {
-      const newReport: Report = {
-        ...reportData,
-        report_id: 'rep_' + Date.now(),
-        created_at: new Date().toISOString(),
-        validation_count: 1,
-        status: 'Active',
-        source: 'User',
-      };
-      return {
-        reports: [newReport, ...s.reports],
-      };
+      const now = Date.now();
+      // One live flag per type; old flags expire so unrelated events don't add up over a night
+      const live = s.dangerFlags.filter((f) => f.type !== type && now - f.at < FLAG_TTL_MS);
+      return { dangerFlags: [...live, { type, label, at: now }] };
     }),
+  clearFlags: () => set({ dangerFlags: [] }),
+  setNavigationActive: (navigationActive) => set({ navigationActive }),
+
+  upsertReport: (report) =>
+    set((s) => {
+      const others = s.reports.filter((r) => r.report_id !== report.report_id);
+      // Resolved reports disappear; shadowbanned ones stay visible to their author only
+      return { reports: report.status === 'Resolved' ? others : [report, ...others] };
+    }),
+  markVoted: (reportId, verdict) =>
+    set((s) => ({ votedReports: { ...s.votedReports, [reportId]: verdict } })),
+  bumpRouteRefresh: () => set((s) => ({ routeRefreshKey: s.routeRefreshKey + 1 })),
 
   addSafeHaven: (havenData) =>
     set((s) => ({
@@ -346,4 +390,17 @@ export const useAppStore = create<AppState>((set) => ({
     set((s) => ({
       safeHavens: s.safeHavens.filter((h) => h.id !== id),
     })),
+}), {
+  name: 'lumina-settings',
+  storage: createJSONStorage(() => localStorage),
+  // Rehydrated manually on the client (see StoreHydration) to avoid SSR mismatches
+  skipHydration: true,
+  partialize: (s) => ({
+    userId: s.userId,
+    trustedContacts: s.trustedContacts,
+    smsFallbackGlobal: s.smsFallbackGlobal,
+    liveLocationSharing: s.liveLocationSharing,
+    deadManSettings: s.deadManSettings,
+    votedReports: s.votedReports,
+  }),
 }));

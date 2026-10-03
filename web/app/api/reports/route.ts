@@ -1,10 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getReports, addReport } from '@/lib/db';
+import { NextRequest } from 'next/server';
+import { getReports, addReport, ReportCategory } from '@/lib/db';
+import { json, errorResponse, isValidCoord } from '@/lib/apiHelpers';
+
+export const dynamic = 'force-dynamic';
+
+const CATEGORIES: ReportCategory[] = ['Suspicious Activity', 'Lighting Issue', 'Obstacle'];
 
 export async function GET() {
   try {
-    const reports = getReports();
-    const featureCollection = {
+    const reports = await getReports();
+    return json({
       type: 'FeatureCollection',
       features: reports.map((r) => ({
         type: 'Feature',
@@ -19,36 +24,30 @@ export async function GET() {
           created_at: r.created_at,
         },
       })),
-    };
-
-    return NextResponse.json(featureCollection);
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    });
+  } catch (err) {
+    return errorResponse(err);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { lat, lng, category, description, author_id } = body;
+    const { lat, lng, category, description, author_id } = await req.json();
 
-    if (lat === undefined || lng === undefined || !category) {
-      return NextResponse.json(
-        { error: 'lat, lng, and category are required' },
-        { status: 400 }
-      );
+    if (!isValidCoord(lat, lng) || !CATEGORIES.includes(category)) {
+      return json({ error: `Valid lat, lng and category (${CATEGORIES.join(', ')}) are required` }, 400);
     }
 
-    const newReport = addReport({
+    const report = await addReport({
       lat: Number(lat),
       lng: Number(lng),
       category,
-      description: description ? String(description).trim() : undefined,
+      description: description ? String(description).trim().slice(0, 500) || undefined : undefined,
       author_id,
     });
 
-    return NextResponse.json(newReport, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return json(report, 201);
+  } catch (err) {
+    return errorResponse(err);
   }
 }

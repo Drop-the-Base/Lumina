@@ -1,53 +1,49 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getPlaces, addPlace } from '@/lib/db';
+import { json, errorResponse, isValidCoord } from '@/lib/apiHelpers';
+
+export const dynamic = 'force-dynamic';
+
+const ICONS: Record<string, string> = {
+  Police: '🚓',
+  SafeHaven: '🛡️',
+  Personal: '🏠',
+  Medical: '🏥',
+};
 
 export async function GET() {
   try {
-    const places = getPlaces();
-    return NextResponse.json(places);
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return json(await getPlaces());
+  } catch (err) {
+    return errorResponse(err);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { name, category, address, lat, lng, icon } = body;
+    const { name, category, address, lat, lng, icon, owner_id } = await req.json();
 
-    if (!name || !category || lat === undefined || lng === undefined) {
-      return NextResponse.json(
-        { error: 'name, category, lat, and lng are required fields' },
-        { status: 400 }
-      );
+    if (!name || !String(name).trim() || !isValidCoord(lat, lng)) {
+      return json({ error: 'name, lat and lng are required' }, 400);
+    }
+    if (!(category in ICONS)) {
+      return json({ error: `category must be one of: ${Object.keys(ICONS).join(', ')}` }, 400);
     }
 
-    const validCategories = ['Police', 'SafeHaven', 'Personal', 'Medical'];
-    if (!validCategories.includes(category)) {
-      return NextResponse.json(
-        { error: `category must be one of: ${validCategories.join(', ')}` },
-        { status: 400 }
-      );
-    }
+    const place = await addPlace(
+      {
+        name: String(name).trim().slice(0, 120),
+        category,
+        address: address ? String(address).trim().slice(0, 200) : 'Wskazany punkt na mapie',
+        lat: Number(lat),
+        lng: Number(lng),
+        icon: icon || ICONS[category],
+      },
+      owner_id
+    );
 
-    const iconMap: Record<string, string> = {
-      Police: '🚓',
-      SafeHaven: '🛡️',
-      Personal: '🏠',
-      Medical: '🏥',
-    };
-
-    const newPlace = addPlace({
-      name: String(name).trim(),
-      category,
-      address: address ? String(address).trim() : 'Wskazany punkt na mapie',
-      lat: Number(lat),
-      lng: Number(lng),
-      icon: icon || iconMap[category] || '📍',
-    });
-
-    return NextResponse.json(newPlace, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return json(place, 201);
+  } catch (err) {
+    return errorResponse(err);
   }
 }
