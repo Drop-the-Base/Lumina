@@ -19,35 +19,38 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <div className="w-full min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center relative font-sans">
-      {/* Desktop presentation header */}
-      <div className="hidden md:flex items-center justify-between w-full max-w-4xl px-6 py-3 mb-2 z-20">
+    <div className="w-full min-h-screen bg-gray-950 text-white flex flex-col md:flex-row items-center justify-center relative font-sans md:gap-16 p-4">
+      {/* Desktop presentation sidebar */}
+      <div className="hidden md:flex flex-col items-start justify-center max-w-sm z-20">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-pink-500 flex items-center justify-center text-lg font-bold shadow-lg shadow-violet-900/40">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-violet-600 to-pink-500 flex items-center justify-center text-2xl font-bold shadow-xl shadow-violet-900/40">
             🛡️
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base tracking-tight text-white">Lumina</span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-violet-950 text-violet-300 border border-violet-800">
-                Podgląd Aplikacji Mobilnej
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-extrabold text-2xl tracking-tight text-white">Lumina</span>
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-violet-950 text-violet-300 border border-violet-800">
+                Podgląd Aplikacji
               </span>
             </div>
-            <p className="text-xs text-gray-400">ImpactHer · Bezpieczny powrót do domu</p>
+            <p className="text-sm text-gray-400">ImpactHer · Bezpieczny powrót do domu</p>
           </div>
         </div>
+        <p className="text-gray-500 text-sm mt-4 leading-relaxed">
+          Interaktywny prototyp aplikacji mobilnej. Przetestuj funkcje takie jak nawigacja do domu, zgłaszanie zagrożeń i tryb SOS bezpośrednio w przeglądarce.
+        </p>
       </div>
 
       {/* Desktop Background Ambient Glow */}
       <div className="hidden md:block absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-violet-600/15 rounded-full blur-[140px]" />
-        <div className="absolute bottom-10 left-1/3 w-[400px] h-[400px] bg-pink-600/10 rounded-full blur-[120px]" />
+        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-violet-600/15 rounded-full blur-[140px]" />
+        <div className="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-pink-600/10 rounded-full blur-[120px]" />
       </div>
 
       {/* Smartphone Mockup Container */}
-      <div className="relative z-10 w-full flex items-center justify-center p-0 md:p-4">
+      <div className="relative z-10 flex items-center justify-center">
         {/* Phone Shell (desktop view) */}
-        <div className="hidden md:block relative w-[390px] h-[820px] max-h-[88vh] bg-gray-950 rounded-[50px] border-[12px] border-gray-900 shadow-[0_0_60px_rgba(124,58,237,0.25),0_25px_50px_-12px_rgba(0,0,0,0.95)] ring-1 ring-white/10 overflow-hidden transform-gpu">
+        <div className="hidden md:block relative w-[400px] h-[850px] max-h-[96vh] bg-gray-950 rounded-[50px] border-[12px] border-gray-900 shadow-[0_0_80px_rgba(124,58,237,0.25),0_25px_50px_-12px_rgba(0,0,0,0.95)] ring-1 ring-white/10 overflow-hidden transform-gpu">
           
           {/* Side Buttons (Visual decoration) */}
           <div className="absolute -left-[16px] top-28 w-[4px] h-10 bg-gray-800 rounded-l-md" /> {/* Volume Up */}
