@@ -134,13 +134,15 @@ export default function MapPage() {
     api.getRoute(userLocation, destination).then((data) => {
       setRouteData(data);
       setDangerCount(data.danger_reports_on_fastest);
-
-      if (mapRef.current) {
-        mapRef.current.getSource('safe-route')?.setData(data.safest);
-        mapRef.current.getSource('fast-route')?.setData(data.fastest);
-      }
     }).catch(console.error).finally(() => setLoadingRoute(false));
   }, [destination, userLocation]);
+
+  // Sync route data to map
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return;
+    if (routeData.safest) mapRef.current.getSource('safe-route')?.setData(routeData.safest);
+    if (routeData.fastest) mapRef.current.getSource('fast-route')?.setData(routeData.fastest);
+  }, [routeData, mapLoaded]);
 
   // Sync Markers
   useEffect(() => {
