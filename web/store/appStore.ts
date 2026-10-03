@@ -78,6 +78,7 @@ interface AppState {
   // UI
   reportModalOpen: boolean;
   addHavenModalOpen: boolean;
+  toastMessage: string | null;
 
   // Contacts
   trustedContacts: TrustedContact[];
@@ -98,6 +99,8 @@ interface AppState {
   dismissSOS: () => void;
   setReportModalOpen: (open: boolean) => void;
   setAddHavenModalOpen: (open: boolean) => void;
+  showToast: (msg: string) => void;
+  hideToast: () => void;
 
   // Contacts actions
   addTrustedContact: (contact: Omit<TrustedContact, 'id'>) => void;
@@ -237,6 +240,7 @@ export const useAppStore = create<AppState>((set) => ({
   sosTriggerType: 'Manual',
   reportModalOpen: false,
   addHavenModalOpen: false,
+  toastMessage: null,
 
   trustedContacts: DEFAULT_CONTACTS,
   smsFallbackGlobal: true,
@@ -254,6 +258,8 @@ export const useAppStore = create<AppState>((set) => ({
   dismissSOS: () => set({ sosActive: false }),
   setReportModalOpen: (open) => set({ reportModalOpen: open }),
   setAddHavenModalOpen: (open) => set({ addHavenModalOpen: open }),
+  showToast: (msg) => set({ toastMessage: msg }),
+  hideToast: () => set({ toastMessage: null }),
 
   addTrustedContact: (contact) =>
     set((s) => ({

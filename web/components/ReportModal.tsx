@@ -11,11 +11,10 @@ const CATEGORIES = [
 ] as const;
 
 export default function ReportModal() {
-  const { setReportModalOpen, userLocation, userId } = useAppStore();
+  const { setReportModalOpen, userLocation, userId, showToast, hideToast } = useAppStore();
   const [selected, setSelected] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async () => {
     if (!selected) return;
@@ -29,8 +28,9 @@ export default function ReportModal() {
         description,
         author_id: userId,
       });
-      setSuccess(true);
-      setTimeout(() => setReportModalOpen(false), 1500);
+      setReportModalOpen(false);
+      showToast('Zgłoszono niebezpieczne miejsce!');
+      setTimeout(() => hideToast(), 3000);
     } catch (err) {
       console.error(err);
     } finally {
@@ -51,17 +51,9 @@ export default function ReportModal() {
         {/* Handle */}
         <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto" />
 
-        {success ? (
-          <div className="text-center py-8 space-y-3">
-            <div className="text-5xl">✅</div>
-            <p className="text-white font-bold text-lg">Report submitted!</p>
-            <p className="text-gray-400 text-sm">Thank you for keeping the community safe.</p>
-          </div>
-        ) : (
-          <>
-            <h2 className="text-white font-bold text-xl">Report Danger</h2>
+        <h2 className="text-white font-bold text-xl text-center">Zgłoś Niebezpieczeństwo</h2>
 
-            {/* Category selector */}
+        {/* Category selector */}
             <div className="grid grid-cols-3 gap-3">
               {CATEGORIES.map((cat) => (
                 <button
@@ -77,14 +69,14 @@ export default function ReportModal() {
               ))}
             </div>
 
-            {/* Description */}
-            <textarea
-              placeholder="Optional: describe what you see..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 resize-none focus:outline-none focus:border-violet-500"
-            />
+        {/* Description */}
+        <textarea
+          placeholder="Opcjonalnie: opisz co widzisz..."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 resize-none focus:outline-none focus:border-red-500"
+        />
 
             {/* Location */}
             {userLocation && (
@@ -93,16 +85,14 @@ export default function ReportModal() {
               </p>
             )}
 
-            {/* Submit */}
-            <button
-              onClick={handleSubmit}
-              disabled={!selected || loading}
-              className="w-full py-4 bg-gradient-to-r from-violet-600 to-pink-600 rounded-2xl text-white font-bold text-lg disabled:opacity-40 transition-all active:scale-95"
-            >
-              {loading ? 'Submitting...' : 'Submit Report'}
-            </button>
-          </>
-        )}
+        {/* Submit */}
+        <button
+          onClick={handleSubmit}
+          disabled={!selected || loading}
+          className="w-full py-4 bg-red-600 hover:bg-red-500 rounded-2xl text-white font-bold text-lg disabled:opacity-40 transition-all active:scale-95 shadow-lg shadow-red-900/50 border-2 border-red-500/50"
+        >
+          {loading ? 'Wysyłanie...' : 'Dodaj Zgłoszenie'}
+        </button>
       </div>
     </>
   );
