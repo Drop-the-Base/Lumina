@@ -1029,14 +1029,6 @@ export default function MapPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Action: Save destination to database */}
-              <button
-                onClick={handleOpenAddHaven}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] px-3 py-2 rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5"
-              >
-                <span>💾 Zapisz w bazie</span>
-              </button>
             </div>
 
             {/* START WALKING NAVIGATION BUTTON */}
@@ -1093,7 +1085,7 @@ export default function MapPage() {
                       : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400'
                   }`}
                 >
-                  <span>{isWalking ? '⏸️ Pauza' : '▶️ Idź dalej'}</span>
+                  <span>{isWalking ? '⏸️ Zatrzymaj' : '▶️ Wznów'}</span>
                 </button>
 
                 <button
