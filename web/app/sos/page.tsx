@@ -71,7 +71,7 @@ export default function SosPage() {
 
   if (sent) {
     return (
-      <div className="fixed inset-0 z-50 bg-red-950 flex flex-col items-center justify-center text-center px-6 space-y-6">
+      <div className="absolute inset-0 z-50 bg-red-950 flex flex-col items-center justify-center text-center px-6 space-y-6">
         <div className="text-7xl animate-bounce">🆘</div>
         <div className="space-y-2">
           <h1 className="text-3xl font-black text-white uppercase tracking-wider">Sygnał SOS Wysyłany!</h1>
@@ -115,7 +115,7 @@ export default function SosPage() {
   const progress = (count / initialSeconds) * circumference;
 
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-b from-red-950 via-gray-950 to-red-950 flex flex-col items-center justify-between py-10 px-6 text-center">
+    <div className="absolute inset-0 z-50 bg-gradient-to-b from-red-950 via-gray-950 to-red-950 flex flex-col items-center justify-between py-10 px-6 text-center">
       {/* Header alert type */}
       <div className="space-y-1 mt-4">
         <div className="inline-block px-3 py-1 bg-red-900/80 border border-red-600/80 rounded-full text-xs text-red-200 font-bold uppercase tracking-widest">
