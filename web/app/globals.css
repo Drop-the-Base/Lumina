@@ -26,34 +26,43 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Lumina Walking Person Marker Animation */
-@keyframes lumina-walk-leg-front {
-  0% { transform: rotate(28deg); }
-  50% { transform: rotate(0deg); }
-  100% { transform: rotate(-28deg); }
+/* Lumina Front-Facing Walking Woman Animations */
+@keyframes woman-walk-leg-left {
+  0% { transform: translateY(0px) scaleY(1); }
+  25% { transform: translateY(-4px) scaleY(0.92); }
+  50% { transform: translateY(2.5px) scaleY(1.05); }
+  75% { transform: translateY(-2px) scaleY(0.96); }
+  100% { transform: translateY(0px) scaleY(1); }
 }
 
-@keyframes lumina-walk-leg-back {
-  0% { transform: rotate(-28deg); }
-  50% { transform: rotate(0deg); }
-  100% { transform: rotate(28deg); }
+@keyframes woman-walk-leg-right {
+  0% { transform: translateY(2.5px) scaleY(1.05); }
+  25% { transform: translateY(-2px) scaleY(0.96); }
+  50% { transform: translateY(0px) scaleY(1); }
+  75% { transform: translateY(-4px) scaleY(0.92); }
+  100% { transform: translateY(2.5px) scaleY(1.05); }
 }
 
-@keyframes lumina-walk-arm-front {
-  0% { transform: rotate(-24deg); }
-  50% { transform: rotate(0deg); }
-  100% { transform: rotate(24deg); }
+@keyframes woman-walk-arm-left {
+  0% { transform: rotate(-16deg); }
+  50% { transform: rotate(16deg); }
+  100% { transform: rotate(-16deg); }
 }
 
-@keyframes lumina-walk-arm-back {
-  0% { transform: rotate(24deg); }
-  50% { transform: rotate(0deg); }
-  100% { transform: rotate(-24deg); }
+@keyframes woman-walk-arm-right {
+  0% { transform: rotate(16deg); }
+  50% { transform: rotate(-16deg); }
+  100% { transform: rotate(16deg); }
 }
 
-@keyframes lumina-walk-body-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
+@keyframes woman-walk-body {
+  0%, 100% { transform: translateY(0px) rotate(-1.5deg); }
+  50% { transform: translateY(-2.5px) rotate(1.5deg); }
+}
+
+@keyframes woman-walk-hair {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
 }
 
 @keyframes lumina-radar-pulse {
@@ -67,31 +76,35 @@ body {
   }
 }
 
-.walking-active .lumina-leg-front {
-  animation: lumina-walk-leg-front var(--walk-duration, 0.48s) infinite alternate ease-in-out;
+.walking-active .woman-leg-left {
+  animation: woman-walk-leg-left var(--walk-duration, 0.46s) infinite ease-in-out;
 }
-.walking-active .lumina-leg-back {
-  animation: lumina-walk-leg-back var(--walk-duration, 0.48s) infinite alternate ease-in-out;
+.walking-active .woman-leg-right {
+  animation: woman-walk-leg-right var(--walk-duration, 0.46s) infinite ease-in-out;
 }
-.walking-active .lumina-arm-front {
-  animation: lumina-walk-arm-front var(--walk-duration, 0.48s) infinite alternate ease-in-out;
+.walking-active .woman-arm-left {
+  animation: woman-walk-arm-left var(--walk-duration, 0.46s) infinite alternate ease-in-out;
 }
-.walking-active .lumina-arm-back {
-  animation: lumina-walk-arm-back var(--walk-duration, 0.48s) infinite alternate ease-in-out;
+.walking-active .woman-arm-right {
+  animation: woman-walk-arm-right var(--walk-duration, 0.46s) infinite alternate ease-in-out;
 }
-.walking-active .lumina-body-group {
-  animation: lumina-walk-body-bob var(--walk-duration, 0.48s) infinite alternate ease-in-out;
+.walking-active .woman-body-group {
+  animation: woman-walk-body var(--walk-duration, 0.46s) infinite alternate ease-in-out;
+}
+.walking-active .woman-hair-sway {
+  animation: woman-hair-sway var(--walk-duration, 0.46s) infinite alternate ease-in-out;
 }
 
-.walking-paused .lumina-leg-front,
-.walking-paused .lumina-leg-back,
-.walking-paused .lumina-arm-front,
-.walking-paused .lumina-arm-back,
-.walking-paused .lumina-body-group {
+.walking-paused .woman-leg-left,
+.walking-paused .woman-leg-right,
+.walking-paused .woman-arm-left,
+.walking-paused .woman-arm-right,
+.walking-paused .woman-body-group,
+.walking-paused .woman-hair-sway {
   animation-play-state: paused !important;
 }
 
 .lumina-radar-ring {
   animation: lumina-radar-pulse 1.8s infinite ease-in-out;
-  transform-origin: 20px 46px;
+  transform-origin: 22px 50px;
 }

@@ -82,11 +82,9 @@ function formatETA(durationSec: number): string {
   return `${hours}:${minutes}`;
 }
 
-function renderWalkingPersonHTML(isWalking: boolean, speed: number, heading: number): string {
+function renderWalkingPersonHTML(isWalking: boolean, speed: number): string {
   const duration = speed === 4 ? '0.18s' : speed === 2 ? '0.28s' : '0.46s';
   const walkClass = isWalking ? 'walking-active' : 'walking-paused';
-  const isFacingLeft = heading > 180 && heading < 360;
-  const flip = isFacingLeft ? 'scaleX(-1)' : 'scaleX(1)';
 
   return `
     <div class="relative flex flex-col items-center justify-center -translate-y-4 pointer-events-none select-none ${walkClass}" style="--walk-duration: ${duration};">
@@ -98,56 +96,77 @@ function renderWalkingPersonHTML(isWalking: boolean, speed: number, heading: num
         <span class="text-[9px] font-black text-emerald-400">🛡️ LUMINA</span>
       </div>
 
-      <!-- Walking Character SVG with moving legs -->
-      <div id="nav-walking-figure" style="transform: ${flip}; transition: transform 0.25s ease;" class="relative w-12 h-14 filter drop-shadow-md">
-        <svg viewBox="0 0 40 56" class="w-full h-full overflow-visible">
+      <!-- Front-Facing Walking Woman SVG -->
+      <div id="nav-walking-figure" class="relative w-12 h-14 filter drop-shadow-md">
+        <svg viewBox="0 0 44 58" class="w-full h-full overflow-visible">
           <!-- Feet Ground Shadow & Radar Ring -->
-          <ellipse cx="20" cy="46" rx="13" ry="4" fill="rgba(6, 78, 59, 0.4)" />
-          <ellipse cx="20" cy="46" rx="16" ry="5" fill="none" stroke="rgba(52, 211, 153, 0.7)" stroke-width="1.2" stroke-dasharray="3,2" class="lumina-radar-ring" />
+          <ellipse cx="22" cy="50" rx="14" ry="4" fill="rgba(6, 78, 59, 0.4)" />
+          <ellipse cx="22" cy="50" rx="17" ry="5.5" fill="none" stroke="rgba(52, 211, 153, 0.7)" stroke-width="1.2" stroke-dasharray="3,2" class="lumina-radar-ring" />
 
-          <!-- Back Leg (swings opposite to front leg) -->
-          <g class="lumina-leg-back" style="transform-origin: 20px 30px;">
-            <path d="M19 30 L18 40 L23 41" stroke="#047857" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-            <path d="M20.5 41 L24.5 41" stroke="#e5e7eb" stroke-width="4.8" stroke-linecap="round" fill="none" />
+          <!-- Back Hair / Ponytail Sway -->
+          <g class="woman-hair-sway" style="transform-origin: 22px 10px;">
+            <path d="M25 8 C33 6 36 15 33 24 C30.5 21 28.5 15 25 12 Z" fill="#451a03" stroke="#291002" stroke-width="0.5" />
+            <circle cx="26" cy="9" r="1.8" fill="#10b981" />
           </g>
 
-          <!-- Back Arm (swings opposite to front arm) -->
-          <g class="lumina-arm-back" style="transform-origin: 20px 20px;">
-            <path d="M20 20 L15 28" stroke="#047857" stroke-width="3.2" stroke-linecap="round" fill="none" />
-            <circle cx="15" cy="28" r="1.8" fill="#fed7aa" />
+          <!-- Left Leg (stepping down/up) -->
+          <g class="woman-leg-left" style="transform-origin: 17px 32px;">
+            <!-- Leggings -->
+            <path d="M17 32 L16.5 42 L16 48" stroke="#1e293b" stroke-width="4.2" stroke-linecap="round" fill="none" />
+            <!-- Sneaker -->
+            <path d="M14 49 L18 49 L17.5 47 L14.5 47 Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.8" />
+            <line x1="13.5" y1="49.5" x2="18.5" y2="49.5" stroke="#10b981" stroke-width="1.2" stroke-linecap="round" />
           </g>
 
-          <!-- Torso & Head Group (bobs up and down while walking) -->
-          <g class="lumina-body-group">
-            <!-- Backpack / Satchel on back -->
-            <rect x="13" y="19" width="4.5" height="9" rx="2" fill="#065f46" stroke="#047857" stroke-width="0.8" />
-            <circle cx="15.2" cy="23.5" r="1.2" fill="#34d399" />
+          <!-- Right Leg (stepping down/up alternate) -->
+          <g class="woman-leg-right" style="transform-origin: 27px 32px;">
+            <!-- Leggings -->
+            <path d="M27 32 L27.5 42 L28 48" stroke="#1e293b" stroke-width="4.2" stroke-linecap="round" fill="none" />
+            <!-- Sneaker -->
+            <path d="M26 49 L30 49 L29.5 47 L26.5 47 Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.8" />
+            <line x1="25.5" y1="49.5" x2="30.5" y2="49.5" stroke="#10b981" stroke-width="1.2" stroke-linecap="round" />
+          </g>
 
-            <!-- Torso (Emerald Jacket) -->
-            <rect x="16.5" y="17" width="7.5" height="13" rx="3.5" fill="#059669" stroke="#047857" stroke-width="0.8" />
-            <path d="M20.2 18 L20.2 30" stroke="#047857" stroke-width="0.8" />
+          <!-- Torso & Head Group (bobs vertically while walking) -->
+          <g class="woman-body-group">
+            <!-- Jacket / Top -->
+            <path d="M15 20 Q14 26 16 33 L28 33 Q30 26 29 20 Q22 18 15 20 Z" fill="#059669" stroke="#047857" stroke-width="0.8" />
+            <!-- Zipper / inner top accent -->
+            <path d="M20 20 L22 25 L24 20" fill="#a7f3d0" />
+            <line x1="22" y1="25" x2="22" y2="33" stroke="#047857" stroke-width="1" />
+            <line x1="16" y1="33" x2="28" y2="33" stroke="#0f172a" stroke-width="1.5" />
 
-            <!-- Head & Face -->
-            <circle cx="20" cy="10" r="5.5" fill="#fed7aa" />
-            <!-- Cap / Hair -->
-            <path d="M14.5 10 C14.5 5 25.5 5 25.5 9.5 C25.5 10.5 24 11 23 11 C22 8.5 17 8.5 16 11 Z" fill="#1f2937" />
-            <path d="M22.5 10.2 L27 10.5" stroke="#1f2937" stroke-width="1.8" stroke-linecap="round" />
-            <!-- Eye -->
-            <circle cx="22.5" cy="9.5" r="0.8" fill="#111827" />
+            <!-- Left Arm -->
+            <g class="woman-arm-left" style="transform-origin: 14px 21px;">
+              <path d="M14 21 L12 28 L11 33" stroke="#047857" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              <circle cx="11" cy="33.5" r="1.6" fill="#fed7aa" />
+            </g>
+
+            <!-- Right Arm -->
+            <g class="woman-arm-right" style="transform-origin: 30px 21px;">
+              <path d="M30 21 L32 28 L33 33" stroke="#047857" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              <circle cx="33" cy="33.5" r="1.6" fill="#fed7aa" />
+            </g>
+
+            <!-- Neck -->
+            <rect x="20.5" y="16.5" width="3" height="3" fill="#fed7aa" />
+            <!-- Face -->
+            <ellipse cx="22" cy="12" rx="5" ry="5.5" fill="#fed7aa" />
+            <!-- Eyes with Lashes -->
+            <circle cx="20" cy="11.5" r="0.75" fill="#1e293b" />
+            <circle cx="24" cy="11.5" r="0.75" fill="#1e293b" />
+            <path d="M18.8 10.5 L20.5 10.5" stroke="#1e293b" stroke-width="0.6" stroke-linecap="round" />
+            <path d="M23.5 10.5 L25.2 10.5" stroke="#1e293b" stroke-width="0.6" stroke-linecap="round" />
+            <!-- Cheeks -->
+            <circle cx="18.5" cy="13" r="1" fill="#fca5a5" opacity="0.6" />
+            <circle cx="25.5" cy="13" r="1" fill="#fca5a5" opacity="0.6" />
             <!-- Smile -->
-            <path d="M21.5 12 Q23 13 24 12" stroke="#c2410c" stroke-width="0.75" fill="none" stroke-linecap="round" />
-          </g>
-
-          <!-- Front Leg (swings forward/backward) -->
-          <g class="lumina-leg-front" style="transform-origin: 20px 30px;">
-            <path d="M20.5 30 L21 40 L26 41" stroke="#10b981" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-            <path d="M22.5 41 L27 41" stroke="#ffffff" stroke-width="4.8" stroke-linecap="round" fill="none" />
-          </g>
-
-          <!-- Front Arm (swings opposite to front leg) -->
-          <g class="lumina-arm-front" style="transform-origin: 20px 20px;">
-            <path d="M20.5 20 L25 28" stroke="#34d399" stroke-width="3.2" stroke-linecap="round" fill="none" />
-            <circle cx="25" cy="28" r="1.8" fill="#fed7aa" />
+            <path d="M20.8 14 Q22 15 23.2 14" stroke="#e11d48" stroke-width="0.75" fill="none" stroke-linecap="round" />
+            <!-- Front Hair Framing Face -->
+            <path d="M16 11 C16 5 28 5 28 11 C28 14 27 17 26 18 C26 13 25 8 22 8 C19 8 18 13 18 18 C17 17 16 14 16 11 Z" fill="#451a03" />
+            <!-- Earrings -->
+            <circle cx="16.8" cy="13" r="0.6" fill="#fbbf24" />
+            <circle cx="27.2" cy="13" r="0.6" fill="#fbbf24" />
           </g>
         </svg>
       </div>
@@ -461,7 +480,7 @@ export default function MapPage() {
         const el = document.createElement('div');
         if (isNavigating) {
           el.className = 'custom-nav-marker flex items-center justify-center';
-          el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed, currentHeading);
+          el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed);
         } else {
           el.className = 'w-7 h-7 rounded-full bg-emerald-500 border-3 border-white shadow-xl flex items-center justify-center text-[10px] text-white font-bold ring-4 ring-emerald-500/30 animate-pulse';
           el.innerHTML = '🚶';
@@ -475,7 +494,7 @@ export default function MapPage() {
           if (!el.classList.contains('custom-nav-marker')) {
             el.className = 'custom-nav-marker flex items-center justify-center';
           }
-          el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed, currentHeading);
+          el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed);
         } else {
           if (el.classList.contains('custom-nav-marker')) {
             el.className = 'w-7 h-7 rounded-full bg-emerald-500 border-3 border-white shadow-xl flex items-center justify-center text-[10px] text-white font-bold ring-4 ring-emerald-500/30 animate-pulse';
@@ -604,11 +623,11 @@ export default function MapPage() {
       duration: 1000,
     });
 
-    // Switch marker to animated walking figure
+    // Switch marker to animated front-facing walking woman
     const el = userMarkerRef.current?.getElement();
     if (el) {
       el.className = 'custom-nav-marker flex items-center justify-center';
-      el.innerHTML = renderWalkingPersonHTML(true, 1, bearing);
+      el.innerHTML = renderWalkingPersonHTML(true, 1);
     }
   };
 
@@ -679,12 +698,6 @@ export default function MapPage() {
           duration: 350,
         });
 
-        const figureEl = document.getElementById('nav-walking-figure');
-        if (figureEl) {
-          const isFacingLeft = heading > 180 && heading < 360;
-          figureEl.style.transform = isFacingLeft ? 'scaleX(-1)' : 'scaleX(1)';
-        }
-
         return nextIndex;
       });
     }, 400);
@@ -697,7 +710,7 @@ export default function MapPage() {
     if (!isNavigating || !userMarkerRef.current) return;
     const el = userMarkerRef.current.getElement();
     if (el && el.classList.contains('custom-nav-marker')) {
-      el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed, currentHeading);
+      el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed);
     }
   }, [isWalking, walkSpeed, isNavigating]);
 
