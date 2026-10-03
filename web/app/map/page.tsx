@@ -1131,13 +1131,13 @@ export default function MapPage() {
 
               <div className="flex items-center gap-1.5">
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
                     isSafe
                       ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
                       : 'bg-red-950 text-red-300 border-red-800'
                   }`}
                 >
-                  {isSafe ? '✅ Czysta trasa' : `🚨 Zagrożenia: ${dangerCount}`}
+                  {isSafe ? 'Czysta trasa' : `Zagrożenia: ${dangerCount}`}
                 </span>
                 <button
                   onClick={handleClearRoute}
