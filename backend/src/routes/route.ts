@@ -23,6 +23,50 @@ function distanceInMeters(lat1: number, lng1: number, lat2: number, lng2: number
   return Math.sqrt(x * x + y * y) * R;
 }
 
+export interface RouteStep {
+  instruction: string;
+  street: string;
+  distance_meters: number;
+  duration_seconds: number;
+  type: string;
+  modifier: string;
+  location: [number, number];
+}
+
+function translateManeuver(type: string, modifier?: string, name?: string): string {
+  const street = name && name.trim() ? `w ul. ${name.trim()}` : '';
+  const streetTarget = name && name.trim() ? `ul. ${name.trim()}` : 'celu';
+
+  switch (type) {
+    case 'depart':
+      return name && name.trim() ? `Ruszaj ${street}` : 'Rozpocznij marsz';
+    case 'arrive':
+      return modifier === 'left'
+        ? 'Cel znajduje się po Twojej lewej stronie'
+        : modifier === 'right'
+        ? 'Cel znajduje się po Twojej prawej stronie'
+        : 'Dotarłaś bezpiecznie do celu!';
+    case 'turn':
+    case 'end of road':
+    case 'fork':
+      if (modifier === 'left' || modifier === 'sharp left') return `Skręć w lewo ${street}`.trim();
+      if (modifier === 'right' || modifier === 'sharp right') return `Skręć w prawo ${street}`.trim();
+      if (modifier === 'slight left') return `Łagodnie w lewo ${street}`.trim();
+      if (modifier === 'slight right') return `Łagodnie w prawo ${street}`.trim();
+      return `Skręć ${street}`.trim();
+    case 'continue':
+    case 'new name':
+      return name && name.trim() ? `Kontynuuj ${street}` : 'Idź dalej prosto';
+    case 'roundabout':
+    case 'rotary':
+      return `Na rondzie kieruj się w stronę ${streetTarget}`;
+    default:
+      if (modifier === 'left') return `Skręć w lewo ${street}`.trim();
+      if (modifier === 'right') return `Skręć w prawo ${street}`.trim();
+      return name && name.trim() ? `Kieruj się ${street}` : 'Idź prosto';
+  }
+}
+
 // Returns reports whose coordinates fall within `thresholdMeters` of any route point
 function reportsNearRoute(route: any, reports: NearbyReport[], thresholdMeters = 90): NearbyReport[] {
   if (!route || !route.geometry || !route.geometry.coordinates) return [];
@@ -120,6 +164,17 @@ router.post('/', async (req: Request, res: Response) => {
     const extraDistance = Math.max(0, safest.properties.distance_meters - fastest.properties.distance_meters);
     const extraDuration = Math.max(0, safest.properties.duration_seconds - fastest.properties.duration_seconds);
 
+    const rawSteps = safest.properties?.steps || [];
+    const mappedSteps: RouteStep[] = rawSteps.map((s: any) => ({
+      instruction: translateManeuver(s.maneuver?.type, s.maneuver?.modifier, s.name),
+      street: s.name || '',
+      distance_meters: Math.round(s.distance || 0),
+      duration_seconds: Math.round(s.duration || 0),
+      type: s.maneuver?.type || 'turn',
+      modifier: s.maneuver?.modifier || '',
+      location: s.maneuver?.location || [0, 0],
+    }));
+
     res.json({
       fastest,
       safest,
@@ -136,6 +191,7 @@ router.post('/', async (req: Request, res: Response) => {
       extra_distance_meters: extraDistance,
       extra_duration_seconds: extraDuration,
       avoided_categories: avoidedCategories,
+      steps: mappedSteps,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

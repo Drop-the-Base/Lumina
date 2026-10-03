@@ -3,6 +3,50 @@ import { getReports } from '@/lib/db';
 
 const OSRM_BASE = 'https://router.project-osrm.org/route/v1/foot';
 
+export interface RouteStep {
+  instruction: string;
+  street: string;
+  distance_meters: number;
+  duration_seconds: number;
+  type: string;
+  modifier: string;
+  location: [number, number]; // [lng, lat]
+}
+
+function translateManeuver(type: string, modifier?: string, name?: string): string {
+  const street = name && name.trim() ? `w ul. ${name.trim()}` : '';
+  const streetTarget = name && name.trim() ? `ul. ${name.trim()}` : 'celu';
+
+  switch (type) {
+    case 'depart':
+      return name && name.trim() ? `Ruszaj ${street}` : 'Rozpocznij marsz';
+    case 'arrive':
+      return modifier === 'left'
+        ? 'Cel znajduje się po Twojej lewej stronie'
+        : modifier === 'right'
+        ? 'Cel znajduje się po Twojej prawej stronie'
+        : 'Dotarłaś bezpiecznie do celu!';
+    case 'turn':
+    case 'end of road':
+    case 'fork':
+      if (modifier === 'left' || modifier === 'sharp left') return `Skręć w lewo ${street}`.trim();
+      if (modifier === 'right' || modifier === 'sharp right') return `Skręć w prawo ${street}`.trim();
+      if (modifier === 'slight left') return `Łagodnie w lewo ${street}`.trim();
+      if (modifier === 'slight right') return `Łagodnie w prawo ${street}`.trim();
+      return `Skręć ${street}`.trim();
+    case 'continue':
+    case 'new name':
+      return name && name.trim() ? `Kontynuuj ${street}` : 'Idź dalej prosto';
+    case 'roundabout':
+    case 'rotary':
+      return `Na rondzie kieruj się w stronę ${streetTarget}`;
+    default:
+      if (modifier === 'left') return `Skręć w lewo ${street}`.trim();
+      if (modifier === 'right') return `Skręć w prawo ${street}`.trim();
+      return name && name.trim() ? `Kieruj się ${street}` : 'Idź prosto';
+  }
+}
+
 function distanceInMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -77,7 +121,7 @@ export async function POST(req: NextRequest) {
     }
 
     const coords = `${from_lng},${from_lat};${to_lng},${to_lat}`;
-    const url = `${OSRM_BASE}/${coords}?overview=full&geometries=geojson&alternatives=3`;
+    const url = `${OSRM_BASE}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=3`;
 
     let routes: any[] = [];
     try {
@@ -89,14 +133,47 @@ export async function POST(req: NextRequest) {
       if (res.ok) {
         const data = await res.json();
         if (data.routes && data.routes.length > 0) {
-          routes = data.routes.map((r: any) => ({
-            type: 'Feature',
-            geometry: r.geometry,
-            properties: {
-              distance_meters: Math.round(r.distance),
-              duration_seconds: Math.round(r.duration),
-            },
-          }));
+          routes = data.routes.map((r: any) => {
+            const rawSteps = r.legs?.[0]?.steps || [];
+            const steps: RouteStep[] = rawSteps.map((s: any) => ({
+              instruction: translateManeuver(s.maneuver?.type, s.maneuver?.modifier, s.name),
+              street: s.name || '',
+              distance_meters: Math.round(s.distance || 0),
+              duration_seconds: Math.round(s.duration || 0),
+              type: s.maneuver?.type || 'turn',
+              modifier: s.maneuver?.modifier || '',
+              location: s.maneuver?.location || [0, 0],
+            }));
+
+            return {
+              type: 'Feature',
+              geometry: r.geometry,
+              properties: {
+                distance_meters: Math.round(r.distance),
+                duration_seconds: Math.round(r.duration),
+                steps: steps.length > 0 ? steps : [
+                  {
+                    instruction: 'Kieruj się wyznaczoną trasą',
+                    street: '',
+                    distance_meters: Math.round(r.distance),
+                    duration_seconds: Math.round(r.duration),
+                    type: 'depart',
+                    modifier: '',
+                    location: [Number(from_lng), Number(from_lat)],
+                  },
+                  {
+                    instruction: 'Dotarłaś do celu!',
+                    street: '',
+                    distance_meters: 0,
+                    duration_seconds: 0,
+                    type: 'arrive',
+                    modifier: '',
+                    location: [Number(to_lng), Number(to_lat)],
+                  }
+                ],
+              },
+            };
+          });
         }
       }
     } catch (fetchErr) {
@@ -106,7 +183,7 @@ export async function POST(req: NextRequest) {
     // Fallback if OSRM was unavailable
     if (routes.length === 0) {
       const approxDist = Math.round(distanceInMeters(from_lat, from_lng, to_lat, to_lng));
-      const approxDuration = Math.round((approxDist / 1.3));
+      const approxDuration = Math.round(approxDist / 1.3);
       routes = [
         {
           type: 'Feature',
@@ -120,6 +197,26 @@ export async function POST(req: NextRequest) {
           properties: {
             distance_meters: approxDist,
             duration_seconds: approxDuration,
+            steps: [
+              {
+                instruction: 'Idź prosto w stronę celu',
+                street: '',
+                distance_meters: approxDist,
+                duration_seconds: approxDuration,
+                type: 'depart',
+                modifier: '',
+                location: [Number(from_lng), Number(from_lat)],
+              },
+              {
+                instruction: 'Dotarłaś do celu!',
+                street: '',
+                distance_meters: 0,
+                duration_seconds: 0,
+                type: 'arrive',
+                modifier: '',
+                location: [Number(to_lng), Number(to_lat)],
+              }
+            ],
           },
         },
       ];
@@ -177,6 +274,7 @@ export async function POST(req: NextRequest) {
       extra_distance_meters: extraDistance,
       extra_duration_seconds: extraDuration,
       avoided_categories: avoidedCategories,
+      steps: safest.properties.steps || [],
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

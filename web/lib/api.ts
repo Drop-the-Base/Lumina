@@ -17,6 +17,16 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export interface RouteStep {
+  instruction: string;
+  street: string;
+  distance_meters: number;
+  duration_seconds: number;
+  type: string;
+  modifier: string;
+  location: [number, number]; // [lng, lat]
+}
+
 export interface RouteResponse {
   fastest: GeoJSON.Feature;
   safest: GeoJSON.Feature;
@@ -33,6 +43,7 @@ export interface RouteResponse {
   extra_distance_meters: number;
   extra_duration_seconds: number;
   avoided_categories: string[];
+  steps?: RouteStep[];
 }
 
 export const api = {

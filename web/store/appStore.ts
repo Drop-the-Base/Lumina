@@ -14,6 +14,16 @@ export interface Report {
   source?: 'Community' | 'KMZB' | 'User';
 }
 
+export interface RouteStep {
+  instruction: string;
+  street: string;
+  distance_meters: number;
+  duration_seconds: number;
+  type: string;
+  modifier: string;
+  location: [number, number];
+}
+
 export interface RouteData {
   fastest: GeoJSON.Feature | null;
   safest: GeoJSON.Feature | null;
@@ -30,6 +40,7 @@ export interface RouteData {
   extra_distance_meters: number;
   extra_duration_seconds: number;
   avoided_categories: string[];
+  steps?: RouteStep[];
 }
 
 export interface TrustedContact {

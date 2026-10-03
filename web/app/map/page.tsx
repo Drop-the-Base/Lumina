@@ -19,6 +19,69 @@ function formatKm(meters: number) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
 }
 
+function distanceInMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLng = (lng2 - lng1) * (Math.PI / 180);
+  const meanLat = ((lat1 + lat2) / 2) * (Math.PI / 180);
+  const x = dLng * Math.cos(meanLat);
+  const y = dLat;
+  return Math.sqrt(x * x + y * y) * R;
+}
+
+function calculateBearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const dLng = (lng2 - lng1) * (Math.PI / 180);
+  const lat1Rad = lat1 * (Math.PI / 180);
+  const lat2Rad = lat2 * (Math.PI / 180);
+  const y = Math.sin(dLng) * Math.cos(lat2Rad);
+  const x =
+    Math.cos(lat1Rad) * Math.sin(lat2Rad) -
+    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+  const brng = Math.atan2(y, x) * (180 / Math.PI);
+  return (brng + 360) % 360;
+}
+
+function getManeuverIcon(type?: string, modifier?: string): string {
+  if (type === 'arrive') return '🎯';
+  if (type === 'depart') return '🚶';
+  if (type === 'roundabout' || type === 'rotary') return '🔄';
+  if (modifier === 'sharp left') return '↰';
+  if (modifier === 'left' || modifier === 'slight left') return '⬅️';
+  if (modifier === 'sharp right') return '↱';
+  if (modifier === 'right' || modifier === 'slight right') return '➡️';
+  if (modifier === 'uturn') return '↩️';
+  return '⬆️';
+}
+
+function interpolateRoute(coords: [number, number][], stepMeters = 7): [number, number][] {
+  if (!coords || coords.length < 2) return coords || [];
+  const result: [number, number][] = [coords[0]];
+
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p1 = coords[i];
+    const p2 = coords[i + 1];
+    const dist = distanceInMeters(p1[1], p1[0], p2[1], p2[0]);
+    const numSubsteps = Math.max(1, Math.floor(dist / stepMeters));
+
+    for (let s = 1; s <= numSubsteps; s++) {
+      const frac = s / numSubsteps;
+      result.push([
+        p1[0] + (p2[0] - p1[0]) * frac,
+        p1[1] + (p2[1] - p1[1]) * frac,
+      ]);
+    }
+  }
+
+  return result;
+}
+
+function formatETA(durationSec: number): string {
+  const date = new Date(Date.now() + durationSec * 1000);
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
 export default function MapPage() {
   const router = useRouter();
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -30,6 +93,7 @@ export default function MapPage() {
   const reportPopupRef = useRef<any>(null);
   const destPopupRef = useRef<any>(null);
   const sourcesReadyRef = useRef(false);
+  const isNavigatingRef = useRef(false);
 
   const {
     reports, setReports,
@@ -49,6 +113,21 @@ export default function MapPage() {
   const [loadingRoute, setLoadingRoute] = useState(false);
   const [showWidget, setShowWidget] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  // Active Walking Navigation state
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isWalking, setIsWalking] = useState(false);
+  const [walkSpeed, setWalkSpeed] = useState<number>(1); // 1x, 2x, 4x
+  const [navCoordIndex, setNavCoordIndex] = useState(0);
+  const [navStepIndex, setNavStepIndex] = useState(0);
+  const [currentHeading, setCurrentHeading] = useState(0);
+  const [interpolatedCoords, setInterpolatedCoords] = useState<[number, number][]>([]);
+  const [approachingDanger, setApproachingDanger] = useState<{
+    category: string;
+    description?: string;
+    distanceMeters: number;
+  } | null>(null);
+  const [hasArrived, setHasArrived] = useState(false);
 
   // Initialize MapLibre
   useEffect(() => {
@@ -175,6 +254,7 @@ export default function MapPage() {
 
       // Map click handler — sets destination, calculates route, and allows adding to database
       map.on('click', (e: any) => {
+        if (isNavigatingRef.current) return;
         const hit = map.queryRenderedFeatures(e.point, { layers: ['reports-circles'] });
         if (hit.length > 0) return;
 
@@ -234,9 +314,9 @@ export default function MapPage() {
     mapRef.current.getSource('reports')?.setData(fc);
   }, [reports, mapLoaded]);
 
-  // Calculate route whenever destination or userLocation changes
+  // Calculate route whenever destination changes (unless in active navigation)
   useEffect(() => {
-    if (!destination || !userLocation) return;
+    if (!destination || !userLocation || isNavigatingRef.current) return;
     setLoadingRoute(true);
     setShowWidget(true);
 
@@ -249,8 +329,13 @@ export default function MapPage() {
           dangers_on_route: data.dangers_on_route,
         });
 
-        // Fit map bounds to encompass the route
         const geom = data.safest?.geometry as any;
+        if (geom?.coordinates && geom.coordinates.length > 0) {
+          const densified = interpolateRoute(geom.coordinates, 7);
+          setInterpolatedCoords(densified);
+        }
+
+        // Fit map bounds to encompass the route
         if (mapRef.current && geom?.coordinates) {
           const coords = geom.coordinates;
           if (coords.length > 1) {
@@ -273,7 +358,7 @@ export default function MapPage() {
       })
       .catch((err) => console.error('Route calculation error:', err))
       .finally(() => setLoadingRoute(false));
-  }, [destination, userLocation]);
+  }, [destination]);
 
   // Update Route GeoJSON on map and adjust colors based on safety
   useEffect(() => {
@@ -297,16 +382,51 @@ export default function MapPage() {
   useEffect(() => {
     if (!mapRef.current || !maplibregl || !mapLoaded) return;
 
-    // User Location Marker (Green Pulse)
+    // User Location Marker (Green Pulse or Directional Nav Arrow)
     if (userLocation) {
       if (!userMarkerRef.current) {
         const el = document.createElement('div');
-        el.className = 'w-7 h-7 rounded-full bg-emerald-500 border-3 border-white shadow-xl flex items-center justify-center text-[10px] text-white font-bold ring-4 ring-emerald-500/30 animate-pulse';
-        el.innerHTML = '🚶';
+        if (isNavigating) {
+          el.className = 'custom-nav-marker flex items-center justify-center';
+          el.innerHTML = `
+            <div class="relative flex items-center justify-center">
+              <div class="absolute w-12 h-12 rounded-full bg-emerald-500/25 animate-ping pointer-events-none"></div>
+              <div id="nav-user-arrow" style="transform: rotate(${currentHeading}deg); transition: transform 0.2s linear;" class="relative w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-700 via-emerald-600 to-teal-400 border-2 border-white shadow-2xl flex items-center justify-center text-white ring-4 ring-emerald-500/40">
+                <svg class="w-5 h-5 fill-current text-white drop-shadow" viewBox="0 0 24 24">
+                  <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                </svg>
+              </div>
+            </div>
+          `;
+        } else {
+          el.className = 'w-7 h-7 rounded-full bg-emerald-500 border-3 border-white shadow-xl flex items-center justify-center text-[10px] text-white font-bold ring-4 ring-emerald-500/30 animate-pulse';
+          el.innerHTML = '🚶';
+        }
         userMarkerRef.current = new maplibregl.Marker({ element: el })
           .setLngLat([userLocation[1], userLocation[0]])
           .addTo(mapRef.current);
       } else {
+        const el = userMarkerRef.current.getElement();
+        if (isNavigating) {
+          if (!el.classList.contains('custom-nav-marker')) {
+            el.className = 'custom-nav-marker flex items-center justify-center';
+            el.innerHTML = `
+              <div class="relative flex items-center justify-center">
+                <div class="absolute w-12 h-12 rounded-full bg-emerald-500/25 animate-ping pointer-events-none"></div>
+                <div id="nav-user-arrow" style="transform: rotate(${currentHeading}deg); transition: transform 0.2s linear;" class="relative w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-700 via-emerald-600 to-teal-400 border-2 border-white shadow-2xl flex items-center justify-center text-white ring-4 ring-emerald-500/40">
+                  <svg class="w-5 h-5 fill-current text-white drop-shadow" viewBox="0 0 24 24">
+                    <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                  </svg>
+                </div>
+              </div>
+            `;
+          }
+        } else {
+          if (el.classList.contains('custom-nav-marker')) {
+            el.className = 'w-7 h-7 rounded-full bg-emerald-500 border-3 border-white shadow-xl flex items-center justify-center text-[10px] text-white font-bold ring-4 ring-emerald-500/30 animate-pulse';
+            el.innerHTML = '🚶';
+          }
+        }
         userMarkerRef.current.setLngLat([userLocation[1], userLocation[0]]);
       }
     }
@@ -328,7 +448,7 @@ export default function MapPage() {
       destMarkerRef.current.remove();
       destMarkerRef.current = null;
     }
-  }, [userLocation, destination, mapLoaded]);
+  }, [userLocation, destination, mapLoaded, isNavigating]);
 
   // Sync Safe Haven markers from Database
   useEffect(() => {
@@ -396,7 +516,156 @@ export default function MapPage() {
     return () => sensorRef.current?.stop();
   }, []);
 
+  useEffect(() => {
+    isNavigatingRef.current = isNavigating;
+  }, [isNavigating]);
+
+  // Start Live Walking Navigation
+  const handleStartNavigation = () => {
+    if (!routeData.safest) return;
+
+    const rawCoords = (routeData.safest.geometry as any)?.coordinates as [number, number][];
+    if (!rawCoords || rawCoords.length < 2) return;
+
+    const densified = interpolateRoute(rawCoords, 7);
+    setInterpolatedCoords(densified);
+    setNavCoordIndex(0);
+    setNavStepIndex(0);
+    setHasArrived(false);
+    setIsNavigating(true);
+    setIsWalking(true);
+
+    const p1 = densified[0];
+    const p2 = densified[Math.min(densified.length - 1, 2)];
+    const bearing = calculateBearing(p1[1], p1[0], p2[1], p2[0]);
+    setCurrentHeading(bearing);
+    setUserLocation([p1[1], p1[0]]);
+
+    mapRef.current?.easeTo({
+      center: p1,
+      zoom: 17.5,
+      pitch: 55,
+      bearing,
+      duration: 1000,
+    });
+  };
+
+  // Stop / Exit Navigation
+  const handleStopNavigation = () => {
+    setIsNavigating(false);
+    setIsWalking(false);
+    setHasArrived(false);
+    setApproachingDanger(null);
+
+    const rawCoords = (routeData.safest?.geometry as any)?.coordinates;
+    if (mapRef.current && rawCoords && rawCoords.length > 1) {
+      const bounds = rawCoords.reduce(
+        (acc: any, coord: any) => [
+          Math.min(acc[0], coord[0]),
+          Math.min(acc[1], coord[1]),
+          Math.max(acc[2], coord[0]),
+          Math.max(acc[3], coord[1]),
+        ],
+        [rawCoords[0][0], rawCoords[0][1], rawCoords[0][0], rawCoords[0][1]]
+      );
+      mapRef.current.fitBounds(bounds, {
+        padding: { top: 70, bottom: 260, left: 40, right: 40 },
+        pitch: 0,
+        bearing: 0,
+        maxZoom: 16,
+        duration: 800,
+      });
+    } else {
+      mapRef.current?.easeTo({ pitch: 0, bearing: 0, zoom: 15, duration: 800 });
+    }
+  };
+
+  // Walking simulation tick loop
+  useEffect(() => {
+    if (!isNavigating || !isWalking || hasArrived || interpolatedCoords.length === 0) return;
+
+    const interval = setInterval(() => {
+      setNavCoordIndex((prevIndex) => {
+        const nextIndex = prevIndex + walkSpeed;
+        if (nextIndex >= interpolatedCoords.length - 1) {
+          setHasArrived(true);
+          setIsWalking(false);
+          const lastPt = interpolatedCoords[interpolatedCoords.length - 1];
+          setUserLocation([lastPt[1], lastPt[0]]);
+          return interpolatedCoords.length - 1;
+        }
+
+        const curPt = interpolatedCoords[nextIndex];
+        const lookAhead = interpolatedCoords[Math.min(interpolatedCoords.length - 1, nextIndex + 2)];
+        const heading = calculateBearing(curPt[1], curPt[0], lookAhead[1], lookAhead[0]);
+
+        setCurrentHeading(heading);
+        setUserLocation([curPt[1], curPt[0]]);
+
+        mapRef.current?.easeTo({
+          center: [curPt[0], curPt[1]],
+          bearing: heading,
+          pitch: 55,
+          zoom: 17.5,
+          duration: 350,
+        });
+
+        const arrowEl = document.getElementById('nav-user-arrow');
+        if (arrowEl) {
+          arrowEl.style.transform = `rotate(${heading}deg)`;
+        }
+
+        return nextIndex;
+      });
+    }, 400);
+
+    return () => clearInterval(interval);
+  }, [isNavigating, isWalking, hasArrived, interpolatedCoords, walkSpeed]);
+
+  const steps = routeData.steps || [];
+  const currentStep = steps[navStepIndex] || steps[0];
+  const nextStep = steps[navStepIndex + 1];
+
+  // Auto-advance step when approaching turn
+  useEffect(() => {
+    if (!isNavigating || !userLocation || steps.length === 0) return;
+    const targetStep = steps[navStepIndex];
+    if (!targetStep || !targetStep.location) return;
+
+    const dist = distanceInMeters(userLocation[0], userLocation[1], targetStep.location[1], targetStep.location[0]);
+    if (dist < 20 && navStepIndex < steps.length - 1) {
+      setNavStepIndex((prev) => prev + 1);
+    }
+  }, [isNavigating, userLocation, steps, navStepIndex]);
+
+  // Real-time danger proximity alert during walk
+  useEffect(() => {
+    if (!isNavigating || !userLocation || reports.length === 0) {
+      setApproachingDanger(null);
+      return;
+    }
+
+    const danger = reports.find((r: any) => {
+      const d = distanceInMeters(userLocation[0], userLocation[1], r.lat, r.lng);
+      return d < 80;
+    });
+
+    if (danger) {
+      const d = Math.round(distanceInMeters(userLocation[0], userLocation[1], danger.lat, danger.lng));
+      setApproachingDanger({
+        category: danger.category,
+        description: danger.description,
+        distanceMeters: d,
+      });
+    } else {
+      setApproachingDanger(null);
+    }
+  }, [isNavigating, userLocation, reports]);
+
   const handleClearRoute = () => {
+    if (isNavigating) {
+      handleStopNavigation();
+    }
     setDestination(null);
     setClickedLocation(null);
     setShowWidget(false);
@@ -410,6 +679,7 @@ export default function MapPage() {
       extra_distance_meters: 0,
       extra_duration_seconds: 0,
       avoided_categories: [],
+      steps: [],
     });
     if (mapRef.current) {
       mapRef.current.getSource('safe-route')?.setData({ type: 'FeatureCollection', features: [] });
@@ -429,52 +699,120 @@ export default function MapPage() {
   const dangerCount = routeData.danger_reports_on_safest || 0;
   const dangers = routeData.dangers_on_route || [];
 
+  const totalPoints = interpolatedCoords.length;
+  const progressRatio = totalPoints > 1 ? Math.min(1, navCoordIndex / (totalPoints - 1)) : 0;
+  const remainingDistanceMeters = Math.max(0, Math.round(distanceMeters * (1 - progressRatio)));
+  const remainingDurationSeconds = Math.max(0, Math.round(durationSec * (1 - progressRatio)));
+  const distToNextManeuver = currentStep && userLocation && currentStep.location
+    ? Math.round(distanceInMeters(userLocation[0], userLocation[1], currentStep.location[1], currentStep.location[0]))
+    : 0;
+
   return (
     <div className="relative w-full h-full min-h-[600px] flex-1 overflow-hidden bg-gray-950">
       <div ref={mapContainer} className="w-full h-full" />
 
-      {/* Top Bar */}
-      <div className="absolute top-4 left-4 right-4 flex items-start justify-between pointer-events-none z-30">
-        <div className="pointer-events-auto bg-gray-900/90 backdrop-blur rounded-2xl px-4 py-2.5 border border-gray-700 shadow-xl space-y-0.5">
-          <div className="flex items-center gap-2">
-            <span className="text-white font-bold text-sm">🛡️ Lumina</span>
-            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-              deadManSettings?.enabled
-                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                : 'bg-gray-800 text-gray-400'
-            }`}>
-              {deadManSettings?.enabled ? '⚡ Dead Man: ON' : 'OFF'}
-            </span>
+      {/* Top Bar: Standard Mode vs Active Navigation Mode */}
+      {!isNavigating ? (
+        <div className="absolute top-4 left-4 right-4 flex items-start justify-between pointer-events-none z-30">
+          <div className="pointer-events-auto bg-gray-900/90 backdrop-blur rounded-2xl px-4 py-2.5 border border-gray-700 shadow-xl space-y-0.5">
+            <div className="flex items-center gap-2">
+              <span className="text-white font-bold text-sm">🛡️ Lumina</span>
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                deadManSettings?.enabled
+                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                  : 'bg-gray-800 text-gray-400'
+              }`}>
+                {deadManSettings?.enabled ? '⚡ Dead Man: ON' : 'OFF'}
+              </span>
+            </div>
+            {loadingRoute ? (
+              <div className="text-blue-400 text-xs mt-0.5 flex items-center gap-1.5 animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping" />
+                <span>Wyznaczanie trasy i analiza bezpieczeństwa...</span>
+              </div>
+            ) : destination ? (
+              <div className="text-gray-400 text-[11px] mt-0.5">
+                Cel: <span className="text-white font-mono">{destination[0].toFixed(4)}, {destination[1].toFixed(4)}</span>
+              </div>
+            ) : (
+              <div className="text-gray-400 text-[11px] mt-0.5">
+                Kraków Centrum (Nawigacja bezpieczna)
+              </div>
+            )}
           </div>
-          {loadingRoute ? (
-            <div className="text-blue-400 text-xs mt-0.5 flex items-center gap-1.5 animate-pulse">
-              <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping" />
-              <span>Wyznaczanie trasy i analiza bezpieczeństwa...</span>
-            </div>
-          ) : destination ? (
-            <div className="text-gray-400 text-[11px] mt-0.5">
-              Cel: <span className="text-white font-mono">{destination[0].toFixed(4)}, {destination[1].toFixed(4)}</span>
-            </div>
-          ) : (
-            <div className="text-gray-400 text-[11px] mt-0.5">
-              Kraków Centrum (Nawigacja bezpieczna)
-            </div>
-          )}
-        </div>
 
-        <button
-          onClick={() => {
-            activateSOS('Manual');
-            router.push('/sos');
-          }}
-          className="pointer-events-auto w-14 h-14 bg-red-600 hover:bg-red-500 rounded-full flex flex-col items-center justify-center shadow-lg shadow-red-900/50 transition-all active:scale-95 border-2 border-red-400/50"
-        >
-          <span className="text-white font-black text-sm leading-none">SOS</span>
-          <span className="text-[9px] text-red-200 font-bold tracking-tighter">
-            ({deadManSettings?.manualCountdownSeconds || 5}s)
-          </span>
-        </button>
-      </div>
+          <button
+            onClick={() => {
+              activateSOS('Manual');
+              router.push('/sos');
+            }}
+            className="pointer-events-auto w-14 h-14 bg-red-600 hover:bg-red-500 rounded-full flex flex-col items-center justify-center shadow-lg shadow-red-900/50 transition-all active:scale-95 border-2 border-red-400/50"
+          >
+            <span className="text-white font-black text-sm leading-none">SOS</span>
+            <span className="text-[9px] text-red-200 font-bold tracking-tighter">
+              ({deadManSettings?.manualCountdownSeconds || 5}s)
+            </span>
+          </button>
+        </div>
+      ) : (
+        /* Top Navigation Turn HUD */
+        <div className="absolute top-4 left-3 right-3 flex items-start justify-between gap-2.5 z-40 pointer-events-none">
+          <div className="pointer-events-auto flex-1 bg-gray-950/95 border-2 border-emerald-500/80 rounded-2xl p-3.5 shadow-2xl backdrop-blur flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-600/30 border border-emerald-400 flex items-center justify-center text-2xl flex-shrink-0 shadow-inner">
+              {getManeuverIcon(currentStep?.type, currentStep?.modifier)}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-400 font-black text-base tracking-wide">
+                  {distToNextManeuver < 18 ? 'Teraz skręć!' : `Za ${distToNextManeuver} m`}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
+                  NAWIGACJA
+                </span>
+              </div>
+              <div className="text-white font-extrabold text-sm truncate leading-snug">
+                {currentStep?.instruction || 'Idź prosto wyznaczoną trasą'}
+              </div>
+              {nextStep && (
+                <div className="text-gray-400 text-[11px] truncate mt-0.5">
+                  Następnie: {nextStep.instruction}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              activateSOS('Manual');
+              router.push('/sos');
+            }}
+            className="pointer-events-auto w-14 h-14 bg-red-600 hover:bg-red-500 rounded-full flex flex-col items-center justify-center shadow-lg shadow-red-900/50 transition-all active:scale-95 border-2 border-red-400/50 flex-shrink-0"
+          >
+            <span className="text-white font-black text-sm leading-none">SOS</span>
+            <span className="text-[9px] text-red-200 font-bold tracking-tighter">
+              ({deadManSettings?.manualCountdownSeconds || 5}s)
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Proximity Danger Warning Banner during Navigation */}
+      {isNavigating && approachingDanger && (
+        <div className="absolute top-24 left-3 right-3 z-40 animate-bounce pointer-events-auto">
+          <div className="bg-red-950/95 border-2 border-red-500 text-red-100 rounded-2xl p-3 shadow-2xl backdrop-blur flex items-center gap-3">
+            <span className="text-2xl animate-pulse flex-shrink-0">🚨</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-extrabold text-xs text-red-300 uppercase tracking-wider">
+                Uwaga! Zagrożenie w odległości {approachingDanger.distanceMeters} m!
+              </div>
+              <div className="text-xs font-bold text-white truncate">
+                {approachingDanger.category} {approachingDanger.description ? `• ${approachingDanger.description}` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Save Place Success Banner */}
       {saveSuccessMsg && (
@@ -484,8 +822,8 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* ROUTE SAFETY WIDGET */}
-      {routeData.safest && showWidget && (
+      {/* ROUTE SAFETY OVERVIEW WIDGET (when not actively walking) */}
+      {!isNavigating && routeData.safest && showWidget && (
         <div className="absolute bottom-20 left-3 right-3 z-35 pointer-events-auto animate-slide-up">
           <div
             className={`backdrop-blur rounded-2xl p-4 shadow-2xl transition-all border-2 ${
@@ -608,37 +946,148 @@ export default function MapPage() {
                 <span>💾 Zapisz w bazie</span>
               </button>
             </div>
+
+            {/* START WALKING NAVIGATION BUTTON */}
+            <button
+              onClick={handleStartNavigation}
+              className="w-full mt-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-sm py-3 px-4 rounded-xl shadow-lg shadow-emerald-950/60 active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-emerald-400/40 cursor-pointer"
+            >
+              <span className="text-lg">🚶</span>
+              <span>Rozpocznij nawigację pieszą</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ACTIVE NAVIGATION BOTTOM CONTROL PANEL */}
+      {isNavigating && (
+        <div className="absolute bottom-4 left-3 right-3 z-40 pointer-events-auto animate-slide-up">
+          <div className="bg-gray-950/95 border-2 border-emerald-500/80 rounded-2xl p-4 shadow-2xl backdrop-blur ring-1 ring-emerald-500/30">
+            {/* Walk Progress Bar */}
+            <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden mb-3">
+              <div
+                className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full transition-all duration-300"
+                style={{ width: `${Math.round(progressRatio * 100)}%` }}
+              />
+            </div>
+
+            {/* Metrics & Simulation Controls */}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-white text-2xl font-black">
+                    {formatMin(remainingDurationSeconds)}
+                  </span>
+                  <span className="text-emerald-400 text-xs font-bold">
+                    ({formatKm(remainingDistanceMeters)})
+                  </span>
+                </div>
+                <div className="text-gray-400 text-[11px] flex items-center gap-1.5">
+                  <span>Godz. przybycia:</span>
+                  <span className="text-gray-200 font-bold font-mono">
+                    {formatETA(remainingDurationSeconds)}
+                  </span>
+                  <span className="text-emerald-500 font-bold">• Chroniona</span>
+                </div>
+              </div>
+
+              {/* Simulation Controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsWalking(!isWalking)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 cursor-pointer ${
+                    isWalking
+                      ? 'bg-gray-800 hover:bg-gray-700 text-white border-gray-700'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400'
+                  }`}
+                >
+                  <span>{isWalking ? '⏸️ Pauza' : '▶️ Idź dalej'}</span>
+                </button>
+
+                <button
+                  onClick={() => setWalkSpeed((prev) => (prev === 1 ? 2 : prev === 2 ? 4 : 1))}
+                  className="px-2.5 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-emerald-400 border border-emerald-500/50 text-xs font-black transition-all active:scale-95 cursor-pointer"
+                  title="Zmień prędkość symulacji"
+                >
+                  ⚡ {walkSpeed}x
+                </button>
+              </div>
+            </div>
+
+            {/* Cancel Navigation Button */}
+            <button
+              onClick={handleStopNavigation}
+              className="w-full mt-3 py-2 bg-gray-900 hover:bg-gray-800 text-gray-300 hover:text-white font-bold text-xs rounded-xl border border-gray-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>✕ Zakończ nawigację</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ARRIVAL CELEBRATION MODAL */}
+      {hasArrived && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in pointer-events-auto">
+          <div className="bg-gray-900 border-2 border-emerald-500/80 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl shadow-emerald-950/80 animate-scale-up space-y-4">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center mx-auto text-3xl">
+              🎉
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-white">Dotarłaś bezpiecznie do celu!</h3>
+              <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+                Trasa zakończona sukcesem. System Lumina monitorował Twoje bezpieczeństwo na każdym kroku.
+              </p>
+            </div>
+            <div className="bg-gray-800/80 rounded-2xl p-3 border border-gray-700/60 flex justify-around text-center">
+              <div>
+                <div className="text-[10px] text-gray-400 uppercase font-bold">Dystans</div>
+                <div className="text-sm font-black text-white">{formatKm(distanceMeters)}</div>
+              </div>
+              <div className="w-px bg-gray-700" />
+              <div>
+                <div className="text-[10px] text-gray-400 uppercase font-bold">Status</div>
+                <div className="text-sm font-black text-emerald-400">Bezpiecznie 🛡️</div>
+              </div>
+            </div>
+            <button
+              onClick={handleStopNavigation}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer text-sm"
+            >
+              Zakończ nawigację
+            </button>
           </div>
         </div>
       )}
 
       {/* Tap hint when no destination is selected */}
-      {!destination && (
+      {!destination && !isNavigating && (
         <div className="absolute bottom-40 left-1/2 -translate-x-1/2 bg-gray-900/90 border border-gray-700 backdrop-blur rounded-xl px-3.5 py-2 text-[11px] text-gray-200 font-semibold whitespace-nowrap z-30 shadow-xl flex items-center gap-2">
           <span>📍</span>
           <span>Kliknij dowolne miejsce na mapie, aby wyznaczyć trasę</span>
         </div>
       )}
 
-      {/* Floating Action Buttons */}
-      <div className={`absolute ${routeData.safest && showWidget ? 'bottom-68' : 'bottom-20'} right-3 flex flex-col items-end gap-2.5 z-30 transition-all`}>
-        <button
-          onClick={() => {
-            setClickedLocation(destination || userLocation || [50.0646, 19.9449]);
-            setAddHavenModalOpen(true);
-          }}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full px-4 py-2 font-semibold text-[13px] shadow-lg shadow-emerald-900/50 transition-all active:scale-95 flex items-center justify-center gap-1.5 border border-emerald-400/40 w-32"
-        >
-          <span>🏠 + Miejsce</span>
-        </button>
+      {/* Floating Action Buttons (hidden during active navigation) */}
+      {!isNavigating && (
+        <div className={`absolute ${routeData.safest && showWidget ? 'bottom-72' : 'bottom-20'} right-3 flex flex-col items-end gap-2.5 z-30 transition-all`}>
+          <button
+            onClick={() => {
+              setClickedLocation(destination || userLocation || [50.0646, 19.9449]);
+              setAddHavenModalOpen(true);
+            }}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full px-4 py-2 font-semibold text-[13px] shadow-lg shadow-emerald-900/50 transition-all active:scale-95 flex items-center justify-center gap-1.5 border border-emerald-400/40 w-32"
+          >
+            <span>🏠 + Miejsce</span>
+          </button>
 
-        <button
-          onClick={() => setReportModalOpen(true)}
-          className="bg-red-600 hover:bg-red-500 text-white rounded-full px-4 py-2 font-semibold text-[13px] shadow-xl shadow-red-900/50 transition-all active:scale-95 flex items-center justify-center gap-1.5 border border-red-400/50 w-32"
-        >
-          <span>⚠️ + Zgłoś</span>
-        </button>
-      </div>
+          <button
+            onClick={() => setReportModalOpen(true)}
+            className="bg-red-600 hover:bg-red-500 text-white rounded-full px-4 py-2 font-semibold text-[13px] shadow-xl shadow-red-900/50 transition-all active:scale-95 flex items-center justify-center gap-1.5 border border-red-400/50 w-32"
+          >
+            <span>⚠️ + Zgłoś</span>
+          </button>
+        </div>
+      )}
 
       {/* Global Toast Notification */}
       {toastMessage && (

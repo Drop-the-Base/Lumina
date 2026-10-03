@@ -21,7 +21,7 @@ export async function getRoutes(
   toLat: number
 ): Promise<OsrmRoute[]> {
   const coords = `${fromLng},${fromLat};${toLng},${toLat}`;
-  const url = `${OSRM_BASE}/${coords}?overview=full&geometries=geojson&alternatives=3`;
+  const url = `${OSRM_BASE}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=3`;
 
   const { data } = await axios.get(url, { timeout: 8000 });
 
@@ -35,6 +35,7 @@ export async function getRoutes(
     properties: {
       distance_meters: Math.round(route.distance),
       duration_seconds: Math.round(route.duration),
+      steps: route.legs?.[0]?.steps || [],
     },
   }));
 }
