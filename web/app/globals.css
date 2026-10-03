@@ -26,87 +26,78 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Lumina Front-Facing Walking Woman Animations */
-/* Front-facing walk: legs swing from the hip in opposite phase and the
-   stepping leg shortens (knee lift seen from the front). */
-@keyframes woman-walk-leg-left {
-  0%, 100% { transform: rotate(7deg) translateY(0px) scaleY(1); }
-  25% { transform: rotate(0deg) translateY(-3px) scaleY(0.9); }
-  50% { transform: rotate(-7deg) translateY(0px) scaleY(1); }
-  75% { transform: rotate(0deg) translateY(0.5px) scaleY(1.02); }
+/* Lumina walker — side-profile walk cycle with real knee bend.
+   Pivots are given in SVG viewBox units (transform-box defaults to view-box). */
+.lw-root { --walk-duration: 0.7s; }
+.lw-root .lw-thigh-near, .lw-root .lw-thigh-far { transform-origin: 30px 52px; }
+.lw-root .lw-shin-near, .lw-root .lw-shin-far { transform-origin: 30px 65px; }
+.lw-root .lw-arm-near, .lw-root .lw-arm-far { transform-origin: 30px 33px; }
+.lw-root .lw-fore-near, .lw-root .lw-fore-far { transform-origin: 30px 42px; }
+.lw-root .lw-pony { transform-origin: 23px 15px; }
+.lw-root .lw-shadow { transform-origin: 30px 87px; transform-box: view-box; }
+
+/* Standing pose (paused / arrived) */
+.lw-root .lw-thigh-near { transform: rotate(-4deg); }
+.lw-root .lw-thigh-far { transform: rotate(4deg); }
+.lw-root .lw-fore-near, .lw-root .lw-fore-far { transform: rotate(-12deg); }
+
+.walking-active .lw-thigh-near { animation: lw-thigh var(--walk-duration) linear infinite; }
+.walking-active .lw-shin-near { animation: lw-shin var(--walk-duration) linear infinite; }
+.walking-active .lw-thigh-far { animation: lw-thigh var(--walk-duration) linear infinite; animation-delay: calc(var(--walk-duration) * -0.5); }
+.walking-active .lw-shin-far { animation: lw-shin var(--walk-duration) linear infinite; animation-delay: calc(var(--walk-duration) * -0.5); }
+/* Arms swing opposite to the leg on the same side */
+.walking-active .lw-arm-near { animation: lw-arm var(--walk-duration) ease-in-out infinite; animation-delay: calc(var(--walk-duration) * -0.5); }
+.walking-active .lw-arm-far { animation: lw-arm var(--walk-duration) ease-in-out infinite; }
+.walking-active .lw-fore-near { animation: lw-fore var(--walk-duration) ease-in-out infinite; animation-delay: calc(var(--walk-duration) * -0.5); }
+.walking-active .lw-fore-far { animation: lw-fore var(--walk-duration) ease-in-out infinite; }
+/* Body rises when passing (25% / 75%) and dips at heel strike (0% / 50%) */
+.walking-active .lw-body { animation: lw-bob calc(var(--walk-duration) / 2) ease-in-out infinite; }
+.walking-active .lw-pony { animation: lw-pony calc(var(--walk-duration) / 2) ease-in-out infinite; }
+.walking-active .lw-shadow { animation: lw-shadow calc(var(--walk-duration) / 2) ease-in-out infinite; }
+
+/* Forward = negative rotation (figure faces right) */
+/* 0–50%: stance (foot planted, thigh sweeps back); 50–100%: swing (knee folds,
+   thigh drives forward early so the foot clears the ground) */
+@keyframes lw-thigh {
+  0%   { transform: rotate(-26deg); }
+  50%  { transform: rotate(22deg); }
+  62%  { transform: rotate(8deg); }
+  75%  { transform: rotate(-16deg); }
+  88%  { transform: rotate(-27deg); }
+  100% { transform: rotate(-26deg); }
+}
+@keyframes lw-shin {
+  0%   { transform: rotate(2deg); }
+  40%  { transform: rotate(10deg); }
+  58%  { transform: rotate(48deg); }
+  75%  { transform: rotate(40deg); }
+  90%  { transform: rotate(6deg); }
+  100% { transform: rotate(2deg); }
+}
+@keyframes lw-arm {
+  0%, 100% { transform: rotate(-24deg); }
+  50%      { transform: rotate(22deg); }
+}
+@keyframes lw-fore {
+  0%, 100% { transform: rotate(-38deg); }
+  50%      { transform: rotate(-8deg); }
+}
+@keyframes lw-bob {
+  0%, 100% { transform: translateY(1.2px); }
+  50%      { transform: translateY(-1.4px); }
+}
+@keyframes lw-pony {
+  0%, 100% { transform: rotate(8deg); }
+  50%      { transform: rotate(-6deg); }
+}
+@keyframes lw-shadow {
+  0%, 100% { transform: scaleX(1.08); opacity: 0.38; }
+  50%      { transform: scaleX(0.9); opacity: 0.28; }
 }
 
-@keyframes woman-walk-leg-right {
-  0%, 100% { transform: rotate(-7deg) translateY(0px) scaleY(1); }
-  25% { transform: rotate(0deg) translateY(0.5px) scaleY(1.02); }
-  50% { transform: rotate(7deg) translateY(0px) scaleY(1); }
-  75% { transform: rotate(0deg) translateY(-3px) scaleY(0.9); }
+@keyframes lw-pulse {
+  0%   { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
 }
+.lw-pulse { animation: lw-pulse 1.8s ease-out infinite; }
 
-@keyframes woman-walk-arm-left {
-  0% { transform: rotate(-16deg); }
-  50% { transform: rotate(16deg); }
-  100% { transform: rotate(-16deg); }
-}
-
-@keyframes woman-walk-arm-right {
-  0% { transform: rotate(16deg); }
-  50% { transform: rotate(-16deg); }
-  100% { transform: rotate(16deg); }
-}
-
-/* One bob per step: two steps (25% and 75%) per leg cycle */
-@keyframes woman-walk-body {
-  0%, 50%, 100% { transform: translateY(0px) rotate(0deg); }
-  25% { transform: translateY(-2.5px) rotate(-1.5deg); }
-  75% { transform: translateY(-2.5px) rotate(1.5deg); }
-}
-
-@keyframes woman-walk-hair {
-  0%, 100% { transform: rotate(-8deg); }
-  50% { transform: rotate(8deg); }
-}
-
-@keyframes lumina-radar-pulse {
-  0%, 100% {
-    transform: scale(0.95);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 0.95;
-  }
-}
-
-.walking-active .woman-leg-left {
-  animation: woman-walk-leg-left var(--walk-duration, 0.7s) infinite ease-in-out;
-}
-.walking-active .woman-leg-right {
-  animation: woman-walk-leg-right var(--walk-duration, 0.7s) infinite ease-in-out;
-}
-.walking-active .woman-arm-left {
-  animation: woman-walk-arm-left var(--walk-duration, 0.7s) infinite ease-in-out;
-}
-.walking-active .woman-arm-right {
-  animation: woman-walk-arm-right var(--walk-duration, 0.7s) infinite ease-in-out;
-}
-.walking-active .woman-body-group {
-  animation: woman-walk-body var(--walk-duration, 0.7s) infinite ease-in-out;
-}
-.walking-active .woman-hair-sway {
-  animation: woman-walk-hair var(--walk-duration, 0.7s) infinite alternate ease-in-out;
-}
-
-.walking-paused .woman-leg-left,
-.walking-paused .woman-leg-right,
-.walking-paused .woman-arm-left,
-.walking-paused .woman-arm-right,
-.walking-paused .woman-body-group,
-.walking-paused .woman-hair-sway {
-  animation-play-state: paused !important;
-}
-
-.lumina-radar-ring {
-  animation: lumina-radar-pulse 1.8s infinite ease-in-out;
-  transform-origin: 22px 50px;
-}

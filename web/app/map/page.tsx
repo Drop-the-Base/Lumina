@@ -96,97 +96,100 @@ function formatETA(durationSec: number): string {
   return `${hours}:${minutes}`;
 }
 
-const WALK_CYCLE: Record<number, string> = { 1: '0.7s', 2: '0.45s', 4: '0.3s' };
+const WALK_CYCLE: Record<number, string> = { 1: '0.8s', 2: '0.55s', 4: '0.38s' };
 
+// Side-profile walker with a real gait cycle (hip + knee joints, counter-swinging
+// arms, bobbing body). Animations live in globals.css under `.lw-*`; pausing
+// swaps `walking-active` for `walking-paused`, which shows a standing pose.
 function renderWalkingPersonHTML(isWalking: boolean, speed: number): string {
   const duration = WALK_CYCLE[speed] ?? WALK_CYCLE[1];
   const walkClass = isWalking ? 'walking-active' : 'walking-paused';
 
+  // translateY lifts the figure so her feet, not her waist, sit on the route point
   return `
-    <div class="relative flex flex-col items-center justify-center -translate-y-4 pointer-events-none select-none ${walkClass}" style="--walk-duration: ${duration};">
-      <!-- Ground Radar Pulse / Safety Circle -->
-      <div class="absolute -bottom-1 w-14 h-5 rounded-full bg-emerald-500/30 border border-emerald-400/60 shadow-lg shadow-emerald-500/50 animate-pulse"></div>
+  <div class="lw-root ${walkClass} pointer-events-none select-none" style="--walk-duration: ${duration}; transform: translateY(-36px); filter: drop-shadow(0 2px 3px rgba(15, 23, 42, 0.35));">
+    <svg viewBox="0 0 60 92" width="52" height="80" style="overflow:visible">
+      <defs>
+        <linearGradient id="lw-jacket" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#a855f7" />
+          <stop offset="1" stop-color="#ec4899" />
+        </linearGradient>
+        <linearGradient id="lw-hair" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#6b3a24" />
+          <stop offset="1" stop-color="#3b1d12" />
+        </linearGradient>
+      </defs>
 
-      <!-- Direction Pointer / Shield Halo -->
-      <div class="absolute -top-3.5 px-2 py-0.5 rounded-full bg-gray-950/95 border border-emerald-400 shadow-md flex items-center gap-1 scale-75 origin-bottom">
-        <span class="text-[9px] font-black text-emerald-400">🛡️ LUMINA</span>
-      </div>
+      <!-- ground -->
+      <ellipse class="lw-pulse" cx="30" cy="87" rx="14" ry="4.5" fill="none" stroke="#a78bfa" stroke-width="1.4" style="transform-origin:30px 87px" />
+      <ellipse class="lw-shadow" cx="30" cy="87" rx="11" ry="3" fill="#1e1b4b" opacity="0.35" />
 
-      <!-- Front-Facing Walking Woman SVG -->
-      <div id="nav-walking-figure" class="relative w-12 h-14 filter drop-shadow-md">
-        <svg viewBox="0 0 44 58" class="w-full h-full overflow-visible">
-          <!-- Feet Ground Shadow & Radar Ring -->
-          <ellipse cx="22" cy="50" rx="14" ry="4" fill="rgba(6, 78, 59, 0.4)" />
-          <ellipse cx="22" cy="50" rx="17" ry="5.5" fill="none" stroke="rgba(52, 211, 153, 0.7)" stroke-width="1.2" stroke-dasharray="3,2" class="lumina-radar-ring" />
-
-          <!-- Back Hair / Ponytail Sway -->
-          <g class="woman-hair-sway" style="transform-origin: 22px 10px;">
-            <path d="M25 8 C33 6 36 15 33 24 C30.5 21 28.5 15 25 12 Z" fill="#451a03" stroke="#291002" stroke-width="0.5" />
-            <circle cx="26" cy="9" r="1.8" fill="#10b981" />
+      <g class="lw-body">
+        <!-- far arm (behind body) -->
+        <g class="lw-arm-far">
+          <line x1="30" y1="33" x2="30" y2="42" stroke="#6d28d9" stroke-width="5" stroke-linecap="round" />
+          <g class="lw-fore-far">
+            <line x1="30" y1="42" x2="30" y2="49.5" stroke="#6d28d9" stroke-width="4.4" stroke-linecap="round" />
+            <circle cx="30" cy="51" r="2.2" fill="#e8b08f" />
           </g>
+        </g>
 
-          <!-- Left Leg (stepping down/up) -->
-          <g class="woman-leg-left" style="transform-origin: 17px 32px;">
-            <!-- Leggings -->
-            <path d="M17 32 L16.5 42 L16 48" stroke="#1e293b" stroke-width="4.2" stroke-linecap="round" fill="none" />
-            <!-- Sneaker -->
-            <path d="M14 49 L18 49 L17.5 47 L14.5 47 Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.8" />
-            <line x1="13.5" y1="49.5" x2="18.5" y2="49.5" stroke="#10b981" stroke-width="1.2" stroke-linecap="round" />
+        <!-- far leg -->
+        <g class="lw-thigh-far">
+          <line x1="30" y1="52" x2="30" y2="65" stroke="#1e1b4b" stroke-width="7" stroke-linecap="round" />
+          <g class="lw-shin-far">
+            <line x1="30" y1="65" x2="30" y2="78" stroke="#1e1b4b" stroke-width="6" stroke-linecap="round" />
+            <path d="M26.6 77 h5.6 c3.6 0 5.2 1.6 5.4 4 v0.6 h-11 z" fill="#e5e7eb" />
+            <path d="M26.6 81.6 h11" stroke="#db2777" stroke-width="1.3" stroke-linecap="round" />
           </g>
+        </g>
 
-          <!-- Right Leg (stepping down/up alternate) -->
-          <g class="woman-leg-right" style="transform-origin: 27px 32px;">
-            <!-- Leggings -->
-            <path d="M27 32 L27.5 42 L28 48" stroke="#1e293b" stroke-width="4.2" stroke-linecap="round" fill="none" />
-            <!-- Sneaker -->
-            <path d="M26 49 L30 49 L29.5 47 L26.5 47 Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.8" />
-            <line x1="25.5" y1="49.5" x2="30.5" y2="49.5" stroke="#10b981" stroke-width="1.2" stroke-linecap="round" />
+        <!-- ponytail (behind head) -->
+        <g class="lw-pony">
+          <path d="M25 13.5 C18.5 12 15 17.5 16 24 C16.6 28.5 19.4 30.5 18.8 34 C22.6 31 23.6 26 23 21.5 C22.7 18.5 23.6 16.5 26 15.2 Z" fill="url(#lw-hair)" />
+        </g>
+
+        <!-- torso / jacket -->
+        <path d="M24.3 34 Q24.6 29.6 29 29.4 H32.4 Q37 29.6 37.2 34.5 L36.6 50.5 Q36.2 55 32 55 H28.4 Q24.4 55 24.3 50.5 Z" fill="url(#lw-jacket)" />
+        <path d="M33.5 30 L33 54.5" stroke="#fbcfe8" stroke-width="0.8" opacity="0.8" />
+        <path d="M24.6 51.5 H36.6" stroke="#831843" stroke-width="1.6" opacity="0.35" />
+
+        <!-- near leg -->
+        <g class="lw-thigh-near">
+          <line x1="30" y1="52" x2="30" y2="65" stroke="#312e81" stroke-width="7" stroke-linecap="round" />
+          <g class="lw-shin-near">
+            <line x1="30" y1="65" x2="30" y2="78" stroke="#312e81" stroke-width="6" stroke-linecap="round" />
+            <path d="M26.6 77 h5.6 c3.6 0 5.2 1.6 5.4 4 v0.6 h-11 z" fill="#ffffff" />
+            <path d="M26.6 81.6 h11" stroke="#ec4899" stroke-width="1.3" stroke-linecap="round" />
           </g>
+        </g>
 
-          <!-- Torso & Head Group (bobs vertically while walking) -->
-          <g class="woman-body-group">
-            <!-- Jacket / Top -->
-            <path d="M15 20 Q14 26 16 33 L28 33 Q30 26 29 20 Q22 18 15 20 Z" fill="#059669" stroke="#047857" stroke-width="0.8" />
-            <!-- Zipper / inner top accent -->
-            <path d="M20 20 L22 25 L24 20" fill="#a7f3d0" />
-            <line x1="22" y1="25" x2="22" y2="33" stroke="#047857" stroke-width="1" />
-            <line x1="16" y1="33" x2="28" y2="33" stroke="#0f172a" stroke-width="1.5" />
+        <!-- neck & head -->
+        <rect x="29" y="25" width="4" height="5.5" rx="1.5" fill="#e8b08f" />
+        <circle cx="32" cy="19" r="8.6" fill="#f6c7a6" />
+        <ellipse cx="29.4" cy="20" rx="1.4" ry="1.9" fill="#e8b08f" />
+        <!-- face (profile, looking right) -->
+        <ellipse cx="36" cy="18.6" rx="1.05" ry="1.45" fill="#1f2937" />
+        <circle cx="36.35" cy="18.1" r="0.35" fill="#ffffff" />
+        <path d="M35 16.6 Q36.2 15.9 37.4 16.5" stroke="#3b1d12" stroke-width="0.7" fill="none" stroke-linecap="round" />
+        <ellipse cx="35.6" cy="21.6" rx="1.6" ry="1" fill="#fb7185" opacity="0.45" />
+        <path d="M37.3 23.2 Q38.4 23.4 39 22.6" stroke="#be123c" stroke-width="0.75" fill="none" stroke-linecap="round" />
+        <!-- hair cap + bangs -->
+        <path d="M40.3 17.2 C40 10.2 34.6 7.6 29.6 8.9 C25 10.1 22.9 14.4 23.6 20.5 C24.6 23.8 27 23.4 27.7 20.6 C28.3 17.6 29.7 15.4 32.6 14.9 C35.6 14.4 38.4 15.6 40.3 17.2 Z" fill="url(#lw-hair)" />
+        <path d="M29.5 10.6 C32 9.6 35 9.9 37 11.4" stroke="#8b5a3c" stroke-width="0.9" fill="none" stroke-linecap="round" opacity="0.8" />
+        <circle cx="25" cy="14.4" r="1.7" fill="#ec4899" />
 
-            <!-- Left Arm -->
-            <g class="woman-arm-left" style="transform-origin: 14px 21px;">
-              <path d="M14 21 L12 28 L11 33" stroke="#047857" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-              <circle cx="11" cy="33.5" r="1.6" fill="#fed7aa" />
-            </g>
-
-            <!-- Right Arm -->
-            <g class="woman-arm-right" style="transform-origin: 30px 21px;">
-              <path d="M30 21 L32 28 L33 33" stroke="#047857" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-              <circle cx="33" cy="33.5" r="1.6" fill="#fed7aa" />
-            </g>
-
-            <!-- Neck -->
-            <rect x="20.5" y="16.5" width="3" height="3" fill="#fed7aa" />
-            <!-- Face -->
-            <ellipse cx="22" cy="12" rx="5" ry="5.5" fill="#fed7aa" />
-            <!-- Eyes with Lashes -->
-            <circle cx="20" cy="11.5" r="0.75" fill="#1e293b" />
-            <circle cx="24" cy="11.5" r="0.75" fill="#1e293b" />
-            <path d="M18.8 10.5 L20.5 10.5" stroke="#1e293b" stroke-width="0.6" stroke-linecap="round" />
-            <path d="M23.5 10.5 L25.2 10.5" stroke="#1e293b" stroke-width="0.6" stroke-linecap="round" />
-            <!-- Cheeks -->
-            <circle cx="18.5" cy="13" r="1" fill="#fca5a5" opacity="0.6" />
-            <circle cx="25.5" cy="13" r="1" fill="#fca5a5" opacity="0.6" />
-            <!-- Smile -->
-            <path d="M20.8 14 Q22 15 23.2 14" stroke="#e11d48" stroke-width="0.75" fill="none" stroke-linecap="round" />
-            <!-- Front Hair Framing Face -->
-            <path d="M16 11 C16 5 28 5 28 11 C28 14 27 17 26 18 C26 13 25 8 22 8 C19 8 18 13 18 18 C17 17 16 14 16 11 Z" fill="#451a03" />
-            <!-- Earrings -->
-            <circle cx="16.8" cy="13" r="0.6" fill="#fbbf24" />
-            <circle cx="27.2" cy="13" r="0.6" fill="#fbbf24" />
+        <!-- near arm (in front of body) -->
+        <g class="lw-arm-near">
+          <line x1="30" y1="33" x2="30" y2="42" stroke="#9333ea" stroke-width="5" stroke-linecap="round" />
+          <g class="lw-fore-near">
+            <line x1="30" y1="42" x2="30" y2="49.5" stroke="#9333ea" stroke-width="4.4" stroke-linecap="round" />
+            <circle cx="30" cy="51" r="2.2" fill="#f6c7a6" />
           </g>
-        </svg>
-      </div>
-    </div>
+        </g>
+      </g>
+    </svg>
+  </div>
   `;
 }
 
