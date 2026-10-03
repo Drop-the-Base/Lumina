@@ -81,7 +81,7 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
           </div>
 
           {/* Inner Phone Screen Content */}
-          <div className="relative w-full h-full pt-10 overflow-y-auto flex flex-col scrollbar-none transform-gpu">
+          <div className="relative w-full h-full pt-10 overflow-hidden flex flex-col scrollbar-none transform-gpu">
             {children}
           </div>
 

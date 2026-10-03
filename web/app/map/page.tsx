@@ -285,42 +285,48 @@ export default function MapPage() {
 
       {/* Route comparison panel */}
       {hasRoutes && (
-        <div className="absolute bottom-24 left-4 right-4 pointer-events-auto">
-          <div className="bg-gray-900/95 backdrop-blur border border-gray-700 rounded-2xl p-4 shadow-2xl">
-            <div className="text-[11px] text-gray-400 font-semibold uppercase tracking-widest mb-3">
-              Porównanie Tras Nawigacji
+        <div className="absolute bottom-20 left-3 right-3 z-35 pointer-events-auto">
+          <div className="bg-gray-900/95 backdrop-blur border border-gray-700 rounded-2xl p-3 shadow-2xl">
+            <div className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest mb-2 flex items-center justify-between">
+              <span>Porównanie Tras Nawigacji</span>
+              <button
+                onClick={() => setDestination(null)}
+                className="text-[10px] text-gray-400 hover:text-white px-1.5 py-0.5 rounded bg-gray-800"
+              >
+                ✕ Zamknij
+              </button>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               {/* Fast route card */}
               <button
                 onClick={() => setActiveRoute('fast')}
-                className={`rounded-xl p-3 border text-left transition-all ${
+                className={`rounded-xl p-2.5 border text-left transition-all ${
                   activeRoute === 'fast'
                     ? 'border-blue-500 bg-blue-900/30'
                     : 'border-gray-700 bg-gray-800/40 opacity-70'
                 }`}
               >
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 flex-shrink-0" />
-                  <span className="text-white font-bold text-sm">Najszybsza</span>
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                  <span className="text-white font-bold text-xs">Najszybsza</span>
                   {activeRoute === 'fast' && (
-                    <span className="ml-auto text-[10px] text-blue-400 font-semibold">AKTYWNA</span>
+                    <span className="ml-auto text-[9px] text-blue-400 font-semibold">AKTYWNA</span>
                   )}
                 </div>
-                <div className="text-white text-xl font-bold leading-none">
+                <div className="text-white text-lg font-bold leading-none">
                   {formatMin(routeData.fastest!.properties?.duration_seconds || 0)}
                 </div>
-                <div className="text-gray-400 text-xs mt-0.5">
+                <div className="text-gray-400 text-[10px] mt-0.5">
                   {formatKm(routeData.fastest!.properties?.distance_meters || 0)}
                 </div>
-                <div className="mt-2">
+                <div className="mt-1.5 text-[10px]">
                   {routeData.danger_reports_on_fastest > 0 ? (
-                    <span className="text-red-400 text-xs">
+                    <span className="text-red-400">
                       ⚠️ {routeData.danger_reports_on_fastest} stref niebezpiecznych
                     </span>
                   ) : (
-                    <span className="text-green-400 text-xs">✅ Bez zagrożeń</span>
+                    <span className="text-green-400">✅ Bez zagrożeń</span>
                   )}
                 </div>
               </button>
@@ -328,28 +334,28 @@ export default function MapPage() {
               {/* Safe route card */}
               <button
                 onClick={() => setActiveRoute('safe')}
-                className={`rounded-xl p-3 border text-left transition-all ${
+                className={`rounded-xl p-2.5 border text-left transition-all ${
                   activeRoute === 'safe'
                     ? 'border-green-500 bg-green-900/30'
                     : 'border-gray-700 bg-gray-800/40 opacity-70'
                 }`}
               >
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
-                  <span className="text-white font-bold text-sm">Bezpieczna</span>
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                  <span className="text-white font-bold text-xs">Bezpieczna</span>
                   {activeRoute === 'safe' && (
-                    <span className="ml-auto text-[10px] text-green-400 font-semibold">AKTYWNA</span>
+                    <span className="ml-auto text-[9px] text-green-400 font-semibold">AKTYWNA</span>
                   )}
                 </div>
-                <div className="text-white text-xl font-bold leading-none">
+                <div className="text-white text-lg font-bold leading-none">
                   {formatMin(routeData.safest?.properties?.duration_seconds || 0)}
                   {extraDuration > 30 && (
-                    <span className="text-gray-400 text-sm font-normal ml-1">
+                    <span className="text-gray-400 text-xs font-normal ml-1">
                       +{Math.round(extraDuration / 60)}m
                     </span>
                   )}
                 </div>
-                <div className="text-gray-400 text-xs mt-0.5">
+                <div className="text-gray-400 text-[10px] mt-0.5">
                   {formatKm(routeData.safest?.properties?.distance_meters || 0)}
                   {extraDistance > 50 && (
                     <span className="text-gray-500 ml-1">
@@ -357,13 +363,13 @@ export default function MapPage() {
                     </span>
                   )}
                 </div>
-                <div className="mt-2">
+                <div className="mt-1.5 text-[10px]">
                   {routeData.danger_reports_on_safest > 0 ? (
-                    <span className="text-orange-400 text-xs">
+                    <span className="text-orange-400">
                       ⚠️ {routeData.danger_reports_on_safest} pozostało
                     </span>
                   ) : (
-                    <span className="text-green-400 text-xs">✅ Czysta trasa</span>
+                    <span className="text-green-400">✅ Czysta trasa</span>
                   )}
                 </div>
               </button>
@@ -371,14 +377,14 @@ export default function MapPage() {
 
             {/* Detour explanation */}
             {hasDetour ? (
-              <div className="mt-3 pt-3 border-t border-gray-700/60 text-xs">
+              <div className="mt-2 pt-2 border-t border-gray-700/60 text-[10px]">
                 <span className="text-gray-400">Bezpieczny objazd omija: </span>
                 <span className="text-amber-400 font-medium">
                   {routeData.avoided_categories.join(' · ')}
                 </span>
               </div>
             ) : (
-              <div className="mt-3 pt-3 border-t border-gray-700/60 text-xs text-gray-500">
+              <div className="mt-2 pt-2 border-t border-gray-700/60 text-[10px] text-gray-500">
                 Obie trasy posiadają zbliżony poziom bezpieczeństwa.
               </div>
             )}
@@ -388,47 +394,49 @@ export default function MapPage() {
 
       {/* Tap hint */}
       {!destination && (
-        <div className="absolute bottom-28 left-1/2 -translate-x-1/2 bg-gray-900/80 backdrop-blur rounded-xl px-4 py-2 text-xs text-gray-400 whitespace-nowrap">
+        <div className="absolute bottom-44 left-1/2 -translate-x-1/2 bg-gray-900/90 border border-gray-700 backdrop-blur rounded-xl px-3 py-1.5 text-[11px] text-gray-300 font-medium whitespace-nowrap z-30 shadow-lg">
           Kliknij na mapę lub posterunek / dom, aby wyznaczyć cel
         </div>
       )}
 
-      {/* Legend */}
-      <div className="absolute bottom-8 left-4 bg-gray-900/90 backdrop-blur rounded-xl p-3 border border-gray-700 text-[11px] space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="w-3.5 h-1.5 bg-green-500 rounded" />
-          <span className="text-gray-300">Bezpieczna trasa</span>
+      {/* Legend (only shown when comparison panel is not active) */}
+      {!hasRoutes && (
+        <div className="absolute bottom-20 left-3 bg-gray-900/90 backdrop-blur rounded-xl p-2.5 border border-gray-700 text-[10px] space-y-1 z-30 shadow-xl max-w-[170px]">
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-1 bg-green-500 rounded" />
+            <span className="text-gray-300">Bezpieczna trasa</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-1" style={{ background: 'repeating-linear-gradient(to right,#3b82f6 0,#3b82f6 3px,transparent 3px,transparent 5px)' }} />
+            <span className="text-gray-300">Najszybsza trasa</span>
+          </div>
+          <div className="flex items-center gap-1.5 pt-0.5">
+            <span>🚓</span>
+            <span className="text-blue-300 font-medium">Policja</span>
+            <span className="ml-1">🛡️</span>
+            <span className="text-emerald-300 font-medium">Safe Haven</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span>🏠</span>
+            <span className="text-purple-300 font-medium">Mój Dom / Bliscy</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3.5 h-1" style={{ background: 'repeating-linear-gradient(to right,#3b82f6 0,#3b82f6 4px,transparent 4px,transparent 6px)' }} />
-          <span className="text-gray-300">Najszybsza trasa</span>
-        </div>
-        <div className="flex items-center gap-2 pt-0.5">
-          <span>🚓</span>
-          <span className="text-blue-300 font-medium">Policja</span>
-          <span className="ml-1">🛡️</span>
-          <span className="text-emerald-300 font-medium">Safe Haven</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span>🏠</span>
-          <span className="text-purple-300 font-medium">Mój Dom / Bliscy</span>
-        </div>
-      </div>
+      )}
 
       {/* Action buttons (Report danger & Add Safe Haven) */}
-      <div className="absolute bottom-8 right-4 flex flex-col items-end gap-2">
+      <div className={`absolute ${hasRoutes ? 'bottom-60' : 'bottom-20'} right-3 flex flex-col items-end gap-2 z-30 transition-all`}>
         <button
           onClick={() => setAddHavenModalOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full px-4 py-2.5 font-semibold text-xs shadow-lg shadow-emerald-900/50 transition-all active:scale-95 flex items-center gap-1.5 border border-emerald-400/40"
+          className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full px-3.5 py-2 font-semibold text-[11px] shadow-lg shadow-emerald-900/50 transition-all active:scale-95 flex items-center gap-1 border border-emerald-400/40"
         >
-          <span>🏠 + Bezpieczne Miejsce</span>
+          <span>🏠 + Miejsce</span>
         </button>
 
         <button
           onClick={() => setReportModalOpen(true)}
-          className="bg-violet-600 hover:bg-violet-500 text-white rounded-full px-4 py-2.5 font-semibold text-xs shadow-lg shadow-violet-900/50 transition-all active:scale-95 flex items-center gap-1.5"
+          className="bg-violet-600 hover:bg-violet-500 text-white rounded-full px-3.5 py-2 font-semibold text-[11px] shadow-lg shadow-violet-900/50 transition-all active:scale-95 flex items-center gap-1"
         >
-          <span>⚠️ Zgłoś Zagrożenie</span>
+          <span>⚠️ Zgłoś</span>
         </button>
       </div>
 
