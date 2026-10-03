@@ -25,7 +25,7 @@ export class SensorEngine {
     // GPS watcher
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => this.handlePosition(pos),
-      (err) => console.error('GPS error:', err),
+      (err) => console.warn(`GPS warning: [Code ${err.code}] ${err.message}`),
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
     );
 

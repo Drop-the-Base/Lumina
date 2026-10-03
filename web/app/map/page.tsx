@@ -10,7 +10,7 @@ import ReportModal from '@/components/ReportModal';
 // MapLibre is client-side only
 let maplibregl: any;
 
-const WARSAW_CENTER: [number, number] = [21.0122, 52.2297]; // [lng, lat]
+const KRAKOW_CENTER: [number, number] = [19.9449, 50.0646]; // [lng, lat]
 
 const CATEGORY_COLORS: Record<string, string> = {
   'Suspicious Activity': '#ef4444',
@@ -23,6 +23,8 @@ export default function MapPage() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const sensorRef = useRef<SensorEngine | null>(null);
+  const userMarkerRef = useRef<any>(null);
+  const destMarkerRef = useRef<any>(null);
 
   const {
     reports, setReports,
@@ -53,7 +55,7 @@ export default function MapPage() {
       const map = new maplibregl.Map({
         container: mapContainer.current,
         style: process.env.NEXT_PUBLIC_MAP_STYLE || 'https://demotiles.maplibre.org/style.json',
-        center: WARSAW_CENTER,
+        center: KRAKOW_CENTER,
         zoom: 13,
       });
 
@@ -121,10 +123,7 @@ export default function MapPage() {
     }).catch(console.error);
   }, [mapLoaded]);
 
-  // Fixed demo location — Warsaw center
-  useEffect(() => {
-    setUserLocation([52.2297, 21.0122]);
-  }, []);
+
 
   // Fetch route when destination changes
   const { destination } = useAppStore();
@@ -141,7 +140,41 @@ export default function MapPage() {
         mapRef.current.getSource('fast-route')?.setData(data.fastest);
       }
     }).catch(console.error).finally(() => setLoadingRoute(false));
-  }, [destination]);
+  }, [destination, userLocation]);
+
+  // Sync Markers
+  useEffect(() => {
+    if (!mapRef.current || !maplibregl) return;
+    
+    // User Location Marker (Green)
+    if (userLocation) {
+      if (!userMarkerRef.current) {
+        userMarkerRef.current = new maplibregl.Marker({ color: '#22c55e' })
+          .setLngLat([userLocation[1], userLocation[0]])
+          .addTo(mapRef.current);
+      } else {
+        userMarkerRef.current.setLngLat([userLocation[1], userLocation[0]]);
+      }
+    }
+
+    // Destination Marker (Blue)
+    if (destination) {
+      if (!destMarkerRef.current) {
+        destMarkerRef.current = new maplibregl.Marker({ color: '#3b82f6' })
+          .setLngLat([destination[1], destination[0]])
+          .addTo(mapRef.current);
+      } else {
+        destMarkerRef.current.setLngLat([destination[1], destination[0]]);
+      }
+    }
+  }, [userLocation, destination, mapLoaded]);
+
+  // Sync route visibility
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return;
+    mapRef.current.setLayoutProperty('safe-route-line', 'visibility', activeRoute === 'safe' ? 'visible' : 'none');
+    mapRef.current.setLayoutProperty('fast-route-line', 'visibility', activeRoute === 'fast' ? 'visible' : 'none');
+  }, [activeRoute, mapLoaded]);
 
   // Start sensor engine
   useEffect(() => {

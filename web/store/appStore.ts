@@ -51,9 +51,9 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  userId: 'demo-user-11111111-1111-1111-1111-111111111111', // Demo user ID
-  userLocation: null,
-  destination: null,
+  userId: '11111111-1111-1111-1111-111111111111', // Demo user ID
+  userLocation: [50.054, 19.935], // Wawel Castle
+  destination: [50.061, 19.937],  // Main Square
   reports: [],
   routeData: { fastest: null, safest: null, danger_reports_on_fastest: 0 },
   activeRoute: 'safe',

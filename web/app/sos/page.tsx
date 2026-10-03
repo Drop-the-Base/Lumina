@@ -19,8 +19,8 @@ export default function SosPage() {
       api.fireSos({
         user_id: userId,
         trigger_type: sosTriggerType || 'Timeout',
-        lat: userLocation?.[0] ?? 52.2297,
-        lng: userLocation?.[1] ?? 21.0122,
+        lat: userLocation?.[0] ?? 50.0646,
+        lng: userLocation?.[1] ?? 19.9449,
       }).then(() => setSent(true)).catch(console.error);
       return;
     }
