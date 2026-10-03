@@ -82,6 +82,79 @@ function formatETA(durationSec: number): string {
   return `${hours}:${minutes}`;
 }
 
+function renderWalkingPersonHTML(isWalking: boolean, speed: number, heading: number): string {
+  const duration = speed === 4 ? '0.18s' : speed === 2 ? '0.28s' : '0.46s';
+  const walkClass = isWalking ? 'walking-active' : 'walking-paused';
+  const isFacingLeft = heading > 180 && heading < 360;
+  const flip = isFacingLeft ? 'scaleX(-1)' : 'scaleX(1)';
+
+  return `
+    <div class="relative flex flex-col items-center justify-center -translate-y-4 pointer-events-none select-none ${walkClass}" style="--walk-duration: ${duration};">
+      <!-- Ground Radar Pulse / Safety Circle -->
+      <div class="absolute -bottom-1 w-14 h-5 rounded-full bg-emerald-500/30 border border-emerald-400/60 shadow-lg shadow-emerald-500/50 animate-pulse"></div>
+
+      <!-- Direction Pointer / Shield Halo -->
+      <div class="absolute -top-3.5 px-2 py-0.5 rounded-full bg-gray-950/95 border border-emerald-400 shadow-md flex items-center gap-1 scale-75 origin-bottom">
+        <span class="text-[9px] font-black text-emerald-400">🛡️ LUMINA</span>
+      </div>
+
+      <!-- Walking Character SVG with moving legs -->
+      <div id="nav-walking-figure" style="transform: ${flip}; transition: transform 0.25s ease;" class="relative w-12 h-14 filter drop-shadow-md">
+        <svg viewBox="0 0 40 56" class="w-full h-full overflow-visible">
+          <!-- Feet Ground Shadow & Radar Ring -->
+          <ellipse cx="20" cy="46" rx="13" ry="4" fill="rgba(6, 78, 59, 0.4)" />
+          <ellipse cx="20" cy="46" rx="16" ry="5" fill="none" stroke="rgba(52, 211, 153, 0.7)" stroke-width="1.2" stroke-dasharray="3,2" class="lumina-radar-ring" />
+
+          <!-- Back Leg (swings opposite to front leg) -->
+          <g class="lumina-leg-back" style="transform-origin: 20px 30px;">
+            <path d="M19 30 L18 40 L23 41" stroke="#047857" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+            <path d="M20.5 41 L24.5 41" stroke="#e5e7eb" stroke-width="4.8" stroke-linecap="round" fill="none" />
+          </g>
+
+          <!-- Back Arm (swings opposite to front arm) -->
+          <g class="lumina-arm-back" style="transform-origin: 20px 20px;">
+            <path d="M20 20 L15 28" stroke="#047857" stroke-width="3.2" stroke-linecap="round" fill="none" />
+            <circle cx="15" cy="28" r="1.8" fill="#fed7aa" />
+          </g>
+
+          <!-- Torso & Head Group (bobs up and down while walking) -->
+          <g class="lumina-body-group">
+            <!-- Backpack / Satchel on back -->
+            <rect x="13" y="19" width="4.5" height="9" rx="2" fill="#065f46" stroke="#047857" stroke-width="0.8" />
+            <circle cx="15.2" cy="23.5" r="1.2" fill="#34d399" />
+
+            <!-- Torso (Emerald Jacket) -->
+            <rect x="16.5" y="17" width="7.5" height="13" rx="3.5" fill="#059669" stroke="#047857" stroke-width="0.8" />
+            <path d="M20.2 18 L20.2 30" stroke="#047857" stroke-width="0.8" />
+
+            <!-- Head & Face -->
+            <circle cx="20" cy="10" r="5.5" fill="#fed7aa" />
+            <!-- Cap / Hair -->
+            <path d="M14.5 10 C14.5 5 25.5 5 25.5 9.5 C25.5 10.5 24 11 23 11 C22 8.5 17 8.5 16 11 Z" fill="#1f2937" />
+            <path d="M22.5 10.2 L27 10.5" stroke="#1f2937" stroke-width="1.8" stroke-linecap="round" />
+            <!-- Eye -->
+            <circle cx="22.5" cy="9.5" r="0.8" fill="#111827" />
+            <!-- Smile -->
+            <path d="M21.5 12 Q23 13 24 12" stroke="#c2410c" stroke-width="0.75" fill="none" stroke-linecap="round" />
+          </g>
+
+          <!-- Front Leg (swings forward/backward) -->
+          <g class="lumina-leg-front" style="transform-origin: 20px 30px;">
+            <path d="M20.5 30 L21 40 L26 41" stroke="#10b981" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+            <path d="M22.5 41 L27 41" stroke="#ffffff" stroke-width="4.8" stroke-linecap="round" fill="none" />
+          </g>
+
+          <!-- Front Arm (swings opposite to front leg) -->
+          <g class="lumina-arm-front" style="transform-origin: 20px 20px;">
+            <path d="M20.5 20 L25 28" stroke="#34d399" stroke-width="3.2" stroke-linecap="round" fill="none" />
+            <circle cx="25" cy="28" r="1.8" fill="#fed7aa" />
+          </g>
+        </svg>
+      </div>
+    </div>
+  `;
+}
+
 export default function MapPage() {
   const router = useRouter();
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -388,16 +461,7 @@ export default function MapPage() {
         const el = document.createElement('div');
         if (isNavigating) {
           el.className = 'custom-nav-marker flex items-center justify-center';
-          el.innerHTML = `
-            <div class="relative flex items-center justify-center">
-              <div class="absolute w-12 h-12 rounded-full bg-emerald-500/25 animate-ping pointer-events-none"></div>
-              <div id="nav-user-arrow" style="transform: rotate(${currentHeading}deg); transition: transform 0.2s linear;" class="relative w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-700 via-emerald-600 to-teal-400 border-2 border-white shadow-2xl flex items-center justify-center text-white ring-4 ring-emerald-500/40">
-                <svg class="w-5 h-5 fill-current text-white drop-shadow" viewBox="0 0 24 24">
-                  <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
-                </svg>
-              </div>
-            </div>
-          `;
+          el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed, currentHeading);
         } else {
           el.className = 'w-7 h-7 rounded-full bg-emerald-500 border-3 border-white shadow-xl flex items-center justify-center text-[10px] text-white font-bold ring-4 ring-emerald-500/30 animate-pulse';
           el.innerHTML = '🚶';
@@ -410,17 +474,8 @@ export default function MapPage() {
         if (isNavigating) {
           if (!el.classList.contains('custom-nav-marker')) {
             el.className = 'custom-nav-marker flex items-center justify-center';
-            el.innerHTML = `
-              <div class="relative flex items-center justify-center">
-                <div class="absolute w-12 h-12 rounded-full bg-emerald-500/25 animate-ping pointer-events-none"></div>
-                <div id="nav-user-arrow" style="transform: rotate(${currentHeading}deg); transition: transform 0.2s linear;" class="relative w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-700 via-emerald-600 to-teal-400 border-2 border-white shadow-2xl flex items-center justify-center text-white ring-4 ring-emerald-500/40">
-                  <svg class="w-5 h-5 fill-current text-white drop-shadow" viewBox="0 0 24 24">
-                    <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
-                  </svg>
-                </div>
-              </div>
-            `;
           }
+          el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed, currentHeading);
         } else {
           if (el.classList.contains('custom-nav-marker')) {
             el.className = 'w-7 h-7 rounded-full bg-emerald-500 border-3 border-white shadow-xl flex items-center justify-center text-[10px] text-white font-bold ring-4 ring-emerald-500/30 animate-pulse';
@@ -548,6 +603,13 @@ export default function MapPage() {
       bearing,
       duration: 1000,
     });
+
+    // Switch marker to animated walking figure
+    const el = userMarkerRef.current?.getElement();
+    if (el) {
+      el.className = 'custom-nav-marker flex items-center justify-center';
+      el.innerHTML = renderWalkingPersonHTML(true, 1, bearing);
+    }
   };
 
   // Stop / Exit Navigation
@@ -577,6 +639,13 @@ export default function MapPage() {
       });
     } else {
       mapRef.current?.easeTo({ pitch: 0, bearing: 0, zoom: 15, duration: 800 });
+    }
+
+    // Restore standard marker
+    const el = userMarkerRef.current?.getElement();
+    if (el) {
+      el.className = 'w-7 h-7 rounded-full bg-emerald-500 border-3 border-white shadow-xl flex items-center justify-center text-[10px] text-white font-bold ring-4 ring-emerald-500/30 animate-pulse';
+      el.innerHTML = '🚶';
     }
   };
 
@@ -610,9 +679,10 @@ export default function MapPage() {
           duration: 350,
         });
 
-        const arrowEl = document.getElementById('nav-user-arrow');
-        if (arrowEl) {
-          arrowEl.style.transform = `rotate(${heading}deg)`;
+        const figureEl = document.getElementById('nav-walking-figure');
+        if (figureEl) {
+          const isFacingLeft = heading > 180 && heading < 360;
+          figureEl.style.transform = isFacingLeft ? 'scaleX(-1)' : 'scaleX(1)';
         }
 
         return nextIndex;
@@ -621,6 +691,15 @@ export default function MapPage() {
 
     return () => clearInterval(interval);
   }, [isNavigating, isWalking, hasArrived, interpolatedCoords, walkSpeed]);
+
+  // Sync walking animation state (play / pause / speed) to marker
+  useEffect(() => {
+    if (!isNavigating || !userMarkerRef.current) return;
+    const el = userMarkerRef.current.getElement();
+    if (el && el.classList.contains('custom-nav-marker')) {
+      el.innerHTML = renderWalkingPersonHTML(isWalking, walkSpeed, currentHeading);
+    }
+  }, [isWalking, walkSpeed, isNavigating]);
 
   const steps = routeData.steps || [];
   const currentStep = steps[navStepIndex] || steps[0];

@@ -25,3 +25,73 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Lumina Walking Person Marker Animation */
+@keyframes lumina-walk-leg-front {
+  0% { transform: rotate(28deg); }
+  50% { transform: rotate(0deg); }
+  100% { transform: rotate(-28deg); }
+}
+
+@keyframes lumina-walk-leg-back {
+  0% { transform: rotate(-28deg); }
+  50% { transform: rotate(0deg); }
+  100% { transform: rotate(28deg); }
+}
+
+@keyframes lumina-walk-arm-front {
+  0% { transform: rotate(-24deg); }
+  50% { transform: rotate(0deg); }
+  100% { transform: rotate(24deg); }
+}
+
+@keyframes lumina-walk-arm-back {
+  0% { transform: rotate(24deg); }
+  50% { transform: rotate(0deg); }
+  100% { transform: rotate(-24deg); }
+}
+
+@keyframes lumina-walk-body-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes lumina-radar-pulse {
+  0%, 100% {
+    transform: scale(0.95);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.95;
+  }
+}
+
+.walking-active .lumina-leg-front {
+  animation: lumina-walk-leg-front var(--walk-duration, 0.48s) infinite alternate ease-in-out;
+}
+.walking-active .lumina-leg-back {
+  animation: lumina-walk-leg-back var(--walk-duration, 0.48s) infinite alternate ease-in-out;
+}
+.walking-active .lumina-arm-front {
+  animation: lumina-walk-arm-front var(--walk-duration, 0.48s) infinite alternate ease-in-out;
+}
+.walking-active .lumina-arm-back {
+  animation: lumina-walk-arm-back var(--walk-duration, 0.48s) infinite alternate ease-in-out;
+}
+.walking-active .lumina-body-group {
+  animation: lumina-walk-body-bob var(--walk-duration, 0.48s) infinite alternate ease-in-out;
+}
+
+.walking-paused .lumina-leg-front,
+.walking-paused .lumina-leg-back,
+.walking-paused .lumina-arm-front,
+.walking-paused .lumina-arm-back,
+.walking-paused .lumina-body-group {
+  animation-play-state: paused !important;
+}
+
+.lumina-radar-ring {
+  animation: lumina-radar-pulse 1.8s infinite ease-in-out;
+  transform-origin: 20px 46px;
+}
