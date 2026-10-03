@@ -40,7 +40,7 @@ export default function ContactsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white px-4 pt-6 pb-24 max-w-md mx-auto space-y-6">
+    <div className="h-full overflow-y-auto bg-gray-950 text-white px-4 pt-4 pb-28 max-w-md mx-auto space-y-6 scrollbar-none">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
