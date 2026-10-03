@@ -19,21 +19,23 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <div className="w-full min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center relative font-sans">
+    <div className="w-full min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center relative font-sans p-2 md:py-3 overflow-x-hidden">
       {/* Desktop presentation header */}
-      <div className="hidden md:flex items-center justify-between w-full max-w-4xl px-6 py-3 mb-2 z-20">
+      <div className="hidden md:flex items-center justify-between w-full max-w-2xl px-4 py-2 mb-1 z-20 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-pink-500 flex items-center justify-center text-lg font-bold shadow-lg shadow-violet-900/40">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-pink-500 flex items-center justify-center text-lg font-bold shadow-lg shadow-violet-900/40 shrink-0">
             🛡️
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-extrabold text-base tracking-tight text-white">Lumina</span>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-violet-950 text-violet-300 border border-violet-800">
-                Podgląd Aplikacji Mobilnej
+                Interaktywny Prototyp Mobilny
               </span>
             </div>
-            <p className="text-xs text-gray-400">ImpactHer · Bezpieczny powrót do domu</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Przetestuj funkcje takie jak nawigacja do domu, zgłaszanie zagrożeń i tryb SOS bezpośrednio w przeglądarce.
+            </p>
           </div>
         </div>
       </div>
@@ -45,14 +47,14 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
       </div>
 
       {/* Smartphone Mockup Container */}
-      <div className="relative z-10 w-full flex items-center justify-center p-0 md:p-4">
+      <div className="relative z-10 w-full flex items-center justify-center p-0 md:py-1 shrink-0">
         {/* Phone Shell (desktop view) */}
-        <div className="hidden md:block relative w-[390px] h-[820px] max-h-[88vh] bg-gray-950 rounded-[50px] border-[12px] border-gray-900 shadow-[0_0_60px_rgba(124,58,237,0.25),0_25px_50px_-12px_rgba(0,0,0,0.95)] ring-1 ring-white/10 overflow-hidden transform-gpu">
+        <div className="hidden md:block relative w-[390px] h-[800px] max-h-[78vh] bg-gray-950 rounded-[48px] border-[10px] border-gray-900 shadow-[0_0_60px_rgba(124,58,237,0.25),0_25px_50px_-12px_rgba(0,0,0,0.95)] ring-1 ring-white/10 overflow-hidden transform-gpu">
           
           {/* Side Buttons (Visual decoration) */}
-          <div className="absolute -left-[16px] top-28 w-[4px] h-10 bg-gray-800 rounded-l-md" /> {/* Volume Up */}
-          <div className="absolute -left-[16px] top-42 w-[4px] h-10 bg-gray-800 rounded-l-md" /> {/* Volume Down */}
-          <div className="absolute -right-[16px] top-32 w-[4px] h-16 bg-gray-800 rounded-r-md" /> {/* Power Button */}
+          <div className="absolute -left-[14px] top-28 w-[4px] h-10 bg-gray-800 rounded-l-md" /> {/* Volume Up */}
+          <div className="absolute -left-[14px] top-42 w-[4px] h-10 bg-gray-800 rounded-l-md" /> {/* Volume Down */}
+          <div className="absolute -right-[14px] top-32 w-[4px] h-16 bg-gray-800 rounded-r-md" /> {/* Power Button */}
 
           {/* Top Status Bar & Dynamic Island */}
           <div className="absolute top-0 left-0 right-0 h-11 px-6 flex items-center justify-between text-[11px] font-semibold text-white/90 z-50 pointer-events-none select-none bg-gradient-to-b from-gray-950/90 to-transparent">
