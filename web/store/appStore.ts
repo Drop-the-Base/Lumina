@@ -17,8 +17,16 @@ export interface Report {
 export interface RouteData {
   fastest: GeoJSON.Feature | null;
   safest: GeoJSON.Feature | null;
+  is_safe?: boolean;
+  safety_status?: 'safe' | 'unsafe';
   danger_reports_on_fastest: number;
   danger_reports_on_safest: number;
+  dangers_on_route?: Array<{
+    category: string;
+    description?: string;
+    lat: number;
+    lng: number;
+  }>;
   extra_distance_meters: number;
   extra_duration_seconds: number;
   avoided_categories: string[];
@@ -62,6 +70,7 @@ interface AppState {
   userId: string;
   userLocation: [number, number] | null; // [lat, lng]
   destination: [number, number] | null;
+  clickedLocation: [number, number] | null;
 
   // Reports & Safe Havens
   reports: Report[];
@@ -91,7 +100,9 @@ interface AppState {
   // Actions
   setUserLocation: (loc: [number, number]) => void;
   setDestination: (loc: [number, number] | null) => void;
+  setClickedLocation: (loc: [number, number] | null) => void;
   setReports: (reports: Report[]) => void;
+  setSafeHavens: (havens: SafeHaven[]) => void;
   setRouteData: (data: RouteData) => void;
   setActiveRoute: (route: 'safe' | 'fast') => void;
   toggleRoute: () => void;
@@ -114,7 +125,7 @@ interface AppState {
   // Report & Haven actions
   voteReport: (reportId: string, isPositive: boolean) => void;
   addCommunityReport: (report: Omit<Report, 'report_id' | 'created_at' | 'validation_count' | 'status'>) => void;
-  addSafeHaven: (haven: Omit<SafeHaven, 'id'>) => void;
+  addSafeHaven: (haven: SafeHaven | Omit<SafeHaven, 'id'>) => void;
   removeSafeHaven: (id: string) => void;
 }
 
@@ -232,6 +243,7 @@ export const useAppStore = create<AppState>((set) => ({
   userId: '11111111-1111-1111-1111-111111111111', // Demo user ID
   userLocation: [50.054, 19.935], // Wawel Castle
   destination: [50.061, 19.937],  // Main Square
+  clickedLocation: null,
   reports: [],
   safeHavens: DEFAULT_SAFE_HAVENS,
   routeData: EMPTY_ROUTE_DATA,
@@ -250,7 +262,9 @@ export const useAppStore = create<AppState>((set) => ({
 
   setUserLocation: (loc) => set({ userLocation: loc }),
   setDestination: (loc) => set({ destination: loc }),
+  setClickedLocation: (loc) => set({ clickedLocation: loc }),
   setReports: (reports) => set({ reports }),
+  setSafeHavens: (safeHavens) => set({ safeHavens }),
   setRouteData: (routeData) => set({ routeData }),
   setActiveRoute: (activeRoute) => set({ activeRoute }),
   toggleRoute: () => set((s) => ({ activeRoute: s.activeRoute === 'safe' ? 'fast' : 'safe' })),
@@ -309,11 +323,11 @@ export const useAppStore = create<AppState>((set) => ({
   addSafeHaven: (havenData) =>
     set((s) => ({
       safeHavens: [
-        ...s.safeHavens,
         {
           ...havenData,
-          id: 'sh_user_' + Date.now().toString().slice(-5),
+          id: 'id' in havenData && havenData.id ? havenData.id : 'sh_user_' + Date.now().toString().slice(-5),
         },
+        ...s.safeHavens,
       ],
     })),
 

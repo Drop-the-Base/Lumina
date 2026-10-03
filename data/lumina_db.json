@@ -1,0 +1,142 @@
+{
+  "places": [
+    {
+      "id": "sh_police_1",
+      "name": "Komisariat I Policji w Krakowie",
+      "category": "Police",
+      "address": "ul. Szeroka 35",
+      "lat": 50.0515,
+      "lng": 19.9480,
+      "icon": "🚓",
+      "created_at": "2026-10-03T10:00:00.000Z"
+    },
+    {
+      "id": "sh_police_2",
+      "name": "Komisariat II Policji w Krakowie",
+      "category": "Police",
+      "address": "ul. Radziwiłłowska 18",
+      "lat": 50.0635,
+      "lng": 19.9470,
+      "icon": "🚓",
+      "created_at": "2026-10-03T10:00:00.000Z"
+    },
+    {
+      "id": "sh_haven_1",
+      "name": "Kawiarnia \"Safe Haven\" (Akcja Ask for Angela)",
+      "category": "SafeHaven",
+      "address": "ul. Floriańska 22",
+      "lat": 50.0625,
+      "lng": 19.9395,
+      "icon": "🛡️",
+      "created_at": "2026-10-03T10:00:00.000Z"
+    },
+    {
+      "id": "sh_haven_2",
+      "name": "Pub Oaza (Bezpieczny Punkt Schronienia)",
+      "category": "SafeHaven",
+      "address": "ul. Szewska 12",
+      "lat": 50.0620,
+      "lng": 19.9340,
+      "icon": "🛡️",
+      "created_at": "2026-10-03T10:00:00.000Z"
+    },
+    {
+      "id": "sh_medical_1",
+      "name": "Całodobowy Punkt Medyczny & Apteka 24/7",
+      "category": "Medical",
+      "address": "ul. Basztowa 15",
+      "lat": 50.0650,
+      "lng": 19.9410,
+      "icon": "🏥",
+      "created_at": "2026-10-03T10:00:00.000Z"
+    },
+    {
+      "id": "sh_personal_1",
+      "name": "Mój Dom (Bezpieczny Cel)",
+      "category": "Personal",
+      "address": "ul. Grodzka 10",
+      "lat": 50.0575,
+      "lng": 19.9380,
+      "icon": "🏠",
+      "created_at": "2026-10-03T10:00:00.000Z"
+    },
+    {
+      "id": "sh_personal_2",
+      "name": "Dom Mamy (Kasia)",
+      "category": "Personal",
+      "address": "ul. Karmelicka 14",
+      "lat": 50.0640,
+      "lng": 19.9310,
+      "icon": "❤️",
+      "created_at": "2026-10-03T10:00:00.000Z"
+    }
+  ],
+  "reports": [
+    {
+      "report_id": "rep_seed_1",
+      "author_id": "11111111-1111-1111-1111-111111111111",
+      "category": "Suspicious Activity",
+      "description": "Group of men following women near tram stop",
+      "validation_count": 4,
+      "status": "Active",
+      "lat": 50.0570,
+      "lng": 19.9380,
+      "created_at": "2026-10-03T18:00:00.000Z"
+    },
+    {
+      "report_id": "rep_seed_2",
+      "author_id": "11111111-1111-1111-1111-111111111111",
+      "category": "Lighting Issue",
+      "description": "Street lights broken for past 3 days",
+      "validation_count": 6,
+      "status": "Active",
+      "lat": 50.0590,
+      "lng": 19.9395,
+      "created_at": "2026-10-03T19:30:00.000Z"
+    },
+    {
+      "report_id": "rep_seed_3",
+      "author_id": "22222222-2222-2222-2222-222222222222",
+      "category": "Obstacle",
+      "description": "Construction blocking the sidewalk, forced into road",
+      "validation_count": 2,
+      "status": "Active",
+      "lat": 50.0600,
+      "lng": 19.9360,
+      "created_at": "2026-10-03T20:00:00.000Z"
+    },
+    {
+      "report_id": "rep_seed_4",
+      "author_id": "22222222-2222-2222-2222-222222222222",
+      "category": "Suspicious Activity",
+      "description": "Aggressive panhandling, feel unsafe",
+      "validation_count": 3,
+      "status": "Active",
+      "lat": 50.0595,
+      "lng": 19.9390,
+      "created_at": "2026-10-03T20:15:00.000Z"
+    },
+    {
+      "report_id": "rep_seed_5",
+      "author_id": "11111111-1111-1111-1111-111111111111",
+      "category": "Lighting Issue",
+      "description": "Entire alleyway is dark at night",
+      "validation_count": 5,
+      "status": "Active",
+      "lat": 50.0630,
+      "lng": 19.9405,
+      "created_at": "2026-10-03T21:00:00.000Z"
+    },
+    {
+      "report_id": "rep_seed_6",
+      "author_id": "22222222-2222-2222-2222-222222222222",
+      "category": "Suspicious Activity",
+      "description": "Someone was following me here last night",
+      "validation_count": 2,
+      "status": "Active",
+      "lat": 50.0605,
+      "lng": 19.9340,
+      "created_at": "2026-10-03T21:30:00.000Z"
+    }
+  ]
+}

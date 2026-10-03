@@ -1,26 +1,28 @@
 import WebSocket from 'ws';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import path from 'path';
 
 if (!globalThis.WebSocket) {
   (globalThis as any).WebSocket = WebSocket;
 }
-import dotenv from 'dotenv';
-import path from 'path';
 
-// Load .env relative to the project root (works regardless of cwd)
+// Load .env relative to the project root
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    'Missing SUPABASE_URL or SUPABASE_SERVICE_KEY.\n' +
-    'Make sure backend/.env is filled in with values from Supabase Dashboard → Settings → API.\n' +
-    `SUPABASE_URL present: ${!!supabaseUrl}, SUPABASE_SERVICE_KEY present: ${!!supabaseKey}`
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseKey);
+
+export const supabase: SupabaseClient | null = isSupabaseConfigured
+  ? createClient(supabaseUrl!, supabaseKey!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+  : null;
+
+if (!isSupabaseConfigured) {
+  console.warn(
+    '⚠️  Supabase credentials not configured in backend/.env. Using local persistent database in data/lumina_db.json'
   );
 }
-
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import placesRouter from './routes/places';
 import reportsRouter from './routes/reports';
 import routeRouter from './routes/route';
 import sosRouter from './routes/sos';
@@ -19,6 +20,7 @@ app.use(cors({
 app.use(express.json());
 
 // Routes
+app.use('/api/places', placesRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/route', routeRouter);
 app.use('/api/sos', sosRouter);

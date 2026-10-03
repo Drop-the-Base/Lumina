@@ -1,23 +1,44 @@
 import { Router, Request, Response } from 'express';
-import { supabase } from '../db/supabase';
+import { supabase, isSupabaseConfigured } from '../db/supabase';
 import { checkReputation, applyValidation } from '../services/trustEngine';
+import { getLocalReports, addLocalReport } from '../services/dbStore';
 
 const router = Router();
 
 // GET /api/reports — returns all Active reports as GeoJSON FeatureCollection
 router.get('/', async (_req: Request, res: Response) => {
   try {
-    const { data, error } = await supabase
-      .from('reports_with_coords')
-      .select('*')
-      .eq('status', 'Active')
-      .order('created_at', { ascending: false });
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('reports_with_coords')
+        .select('*')
+        .eq('status', 'Active')
+        .order('created_at', { ascending: false });
 
-    if (error) throw error;
+      if (!error && data) {
+        const featureCollection = {
+          type: 'FeatureCollection',
+          features: data.map((r: any) => ({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [r.lng, r.lat] },
+            properties: {
+              report_id: r.report_id,
+              category: r.category,
+              description: r.description,
+              validation_count: r.validation_count,
+              status: r.status,
+              created_at: r.created_at,
+            },
+          })),
+        };
+        return res.json(featureCollection);
+      }
+    }
 
+    const local = getLocalReports();
     const featureCollection = {
       type: 'FeatureCollection',
-      features: (data || []).map((r: any) => ({
+      features: local.map((r) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [r.lng, r.lat] },
         properties: {
@@ -47,24 +68,39 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Check author reputation (shadow trust gate)
-    const reputation = author_id ? await checkReputation(author_id) : 1.0;
+    let reputation = 1.0;
+    if (isSupabaseConfigured && author_id) {
+      try {
+        reputation = await checkReputation(author_id);
+      } catch {}
+    }
     const status = reputation < 0.3 ? 'Shadowbanned' : 'Active';
 
-    const { data, error } = await supabase
-      .from('reports')
-      .insert({
-        author_id: author_id || null,
-        location: `POINT(${lng} ${lat})`,
-        category,
-        description: description || null,
-        status,
-      })
-      .select()
-      .single();
+    const localReport = addLocalReport({
+      author_id: author_id || undefined,
+      category,
+      description: description || undefined,
+      lat: Number(lat),
+      lng: Number(lng),
+      status,
+    });
 
-    if (error) throw error;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('reports').insert({
+          report_id: localReport.report_id,
+          author_id: author_id || null,
+          location: `POINT(${lng} ${lat})`,
+          category,
+          description: description || null,
+          status,
+        });
+      } catch (sbErr) {
+        console.warn('Could not sync report to Supabase:', sbErr);
+      }
+    }
 
-    res.status(201).json({ ...data, shadowbanned: status === 'Shadowbanned' });
+    res.status(201).json({ ...localReport, shadowbanned: status === 'Shadowbanned' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -80,7 +116,9 @@ router.patch('/:id/validate', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'user_id and verdict (safe|unsafe) are required' });
     }
 
-    await applyValidation(String(id), String(user_id), verdict as 'safe' | 'unsafe');
+    if (isSupabaseConfigured) {
+      await applyValidation(String(id), String(user_id), verdict as 'safe' | 'unsafe');
+    }
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
