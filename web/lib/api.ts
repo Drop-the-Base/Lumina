@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 const BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -13,8 +15,32 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  // Reports
-  getReports: () => request<GeoJSON.FeatureCollection>('/api/reports'),
+  // Reports — fetched directly from Supabase so the map works without a backend URL
+  getReports: async (): Promise<GeoJSON.FeatureCollection> => {
+    const { data, error } = await supabase
+      .from('reports_with_coords')
+      .select('report_id, category, description, validation_count, status, created_at, lat, lng')
+      .eq('status', 'Active')
+      .order('created_at', { ascending: false });
+
+    if (error) throw new Error(error.message);
+
+    return {
+      type: 'FeatureCollection',
+      features: (data ?? []).map((r: any) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [r.lng, r.lat] },
+        properties: {
+          report_id: r.report_id,
+          category: r.category,
+          description: r.description,
+          validation_count: r.validation_count,
+          status: r.status,
+          created_at: r.created_at,
+        },
+      })),
+    };
+  },
 
   submitReport: (data: {
     lat: number;
