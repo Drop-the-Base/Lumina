@@ -27,6 +27,7 @@ export default function MapPage() {
   const userMarkerRef = useRef<any>(null);
   const destMarkerRef = useRef<any>(null);
   const havenMarkersRef = useRef<any[]>([]);
+  const reportPopupRef = useRef<any>(null);
 
   const {
     reports, setReports,
@@ -82,20 +83,65 @@ export default function MapPage() {
         map.addLayer({
           id: 'reports-circles', type: 'circle', source: 'reports',
           paint: {
-            'circle-radius': 10,
+            'circle-radius': 11,
             'circle-color': ['match', ['get', 'category'],
               'Suspicious Activity', '#ef4444',
               'Lighting Issue', '#f59e0b',
               'Obstacle', '#f97316',
               '#6b7280'],
-            'circle-opacity': 0.85,
+            'circle-opacity': 0.9,
             'circle-stroke-color': '#fff',
             'circle-stroke-width': 2,
           },
         });
+
+        // Report hover/click popups
+        const CATEGORY_META: Record<string, { emoji: string; color: string }> = {
+          'Suspicious Activity': { emoji: '🚨', color: '#ef4444' },
+          'Lighting Issue':      { emoji: '💡', color: '#f59e0b' },
+          'Obstacle':            { emoji: '🚧', color: '#f97316' },
+        };
+
+        map.on('click', 'reports-circles', (e: any) => {
+          if (!e.features?.length) return;
+          const props = e.features[0].properties;
+          const coords = (e.features[0].geometry as any).coordinates.slice() as [number, number];
+          const meta = CATEGORY_META[props.category] ?? { emoji: '⚠️', color: '#6b7280' };
+
+          const diff = props.created_at ? Date.now() - new Date(props.created_at).getTime() : 0;
+          const h = Math.floor(diff / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          const timeAgo = diff ? (h > 0 ? `${h}h temu` : `${m}m temu`) : '';
+
+          reportPopupRef.current?.remove();
+          reportPopupRef.current = new maplibregl.Popup({ offset: 16, maxWidth: '260px', closeButton: true })
+            .setLngLat(coords)
+            .setHTML(`
+              <div style="font-family:sans-serif;padding:4px 0;">
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;">
+                  <span style="font-size:22px;line-height:1;">${meta.emoji}</span>
+                  <span style="font-weight:700;font-size:13px;color:${meta.color};">${props.category}</span>
+                </div>
+                ${props.description
+                  ? `<div style="font-size:12px;color:#374151;margin-bottom:8px;line-height:1.45;">"${props.description}"</div>`
+                  : ''}
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:6px;">
+                  <span>👍 ${props.validation_count ?? 0} potwierdzeń</span>
+                  ${timeAgo ? `<span>${timeAgo}</span>` : ''}
+                </div>
+              </div>
+            `)
+            .addTo(map);
+        });
+
+        map.on('mouseenter', 'reports-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'reports-circles', () => { map.getCanvas().style.cursor = ''; });
       });
 
+      // General map click — set destination, but not when clicking a report circle
       map.on('click', (e: any) => {
+        const hit = map.queryRenderedFeatures(e.point, { layers: ['reports-circles'] });
+        if (hit.length > 0) return;
         const { lng, lat } = e.lngLat;
         setDestination([lat, lng]);
       });
