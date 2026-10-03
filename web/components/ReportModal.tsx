@@ -36,15 +36,7 @@ export default function ReportModal() {
         lng: userLocation?.[1] ?? 19.9449,
       });
 
-      // Also refresh reports from database
-      api.getReports().then((fc) => {
-        const mapped = (fc.features || []).map((f: any) => ({
-          ...f.properties,
-          lat: f.geometry.coordinates[1],
-          lng: f.geometry.coordinates[0],
-        }));
-        setReports(mapped);
-      }).catch(console.error);
+
 
       setReportModalOpen(false);
       showToast('Zgłoszono niebezpieczne miejsce!');
