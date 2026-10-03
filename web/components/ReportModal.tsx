@@ -11,7 +11,7 @@ const CATEGORIES = [
 ] as const;
 
 export default function ReportModal() {
-  const { setReportModalOpen, userLocation, userId, showToast, hideToast } = useAppStore();
+  const { setReportModalOpen, userLocation, userId, showToast, hideToast, addCommunityReport } = useAppStore();
   const [selected, setSelected] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,6 +27,12 @@ export default function ReportModal() {
         category: selected,
         description,
         author_id: userId,
+      });
+      addCommunityReport({
+        category: selected as any,
+        description,
+        lat: userLocation?.[0] ?? 50.0646,
+        lng: userLocation?.[1] ?? 19.9449,
       });
       setReportModalOpen(false);
       showToast('Zgłoszono niebezpieczne miejsce!');

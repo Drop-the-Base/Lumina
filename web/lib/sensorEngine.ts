@@ -17,6 +17,8 @@ export class SensorEngine {
   }
 
   start() {
+    // Location tracking disabled per user request to avoid prompts
+    /*
     if (!navigator.geolocation) {
       console.warn('Geolocation not supported');
       return;
@@ -28,6 +30,7 @@ export class SensorEngine {
       (err) => console.warn(`GPS warning: [Code ${err.code}] ${err.message}`),
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
     );
+    */
 
     // Accelerometer — request permission on iOS
     if (typeof DeviceMotionEvent !== 'undefined') {

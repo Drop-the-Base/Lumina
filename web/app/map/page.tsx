@@ -159,7 +159,7 @@ export default function MapPage() {
     setUserLocation([50.0646, 19.9449]);
   }, []);
 
-  // Fetch reports on map load
+  // Fetch initial reports on map load
   useEffect(() => {
     api.getReports().then((fc) => {
       const mapped = (fc.features || []).map((f: any) => ({
@@ -168,11 +168,22 @@ export default function MapPage() {
         lng: f.geometry.coordinates[0],
       }));
       setReports(mapped);
-      if (mapRef.current && mapLoaded) {
-        mapRef.current.getSource('reports')?.setData(fc);
-      }
     }).catch(console.error);
-  }, [mapLoaded]);
+  }, []);
+
+  // Sync reports to map source when they change in store
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded || !sourcesReadyRef.current) return;
+    const fc: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: reports.map((r: any) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [r.lng, r.lat] },
+        properties: { ...r }
+      }))
+    };
+    mapRef.current.getSource('reports')?.setData(fc);
+  }, [reports, mapLoaded]);
 
   // Fetch route when destination changes
   useEffect(() => {
@@ -427,17 +438,16 @@ export default function MapPage() {
       <div className={`absolute ${hasRoutes ? 'bottom-60' : 'bottom-20'} right-3 flex flex-col items-end gap-2 z-30 transition-all`}>
         <button
           onClick={() => setAddHavenModalOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full px-3.5 py-2 font-semibold text-[11px] shadow-lg shadow-emerald-900/50 transition-all active:scale-95 flex items-center gap-1 border border-emerald-400/40"
+          className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full px-4 py-2 font-semibold text-[13px] shadow-lg shadow-emerald-900/50 transition-all active:scale-95 flex items-center justify-center gap-1.5 border border-emerald-400/40 w-32"
         >
           <span>🏠 + Miejsce</span>
         </button>
 
         <button
           onClick={() => setReportModalOpen(true)}
-          className="bg-red-600 hover:bg-red-500 text-white rounded-full px-5 py-3 font-bold text-[14px] shadow-xl shadow-red-900/50 transition-all active:scale-95 flex items-center gap-2 border border-red-400/50"
+          className="bg-red-600 hover:bg-red-500 text-white rounded-full px-4 py-2 font-semibold text-[13px] shadow-xl shadow-red-900/50 transition-all active:scale-95 flex items-center justify-center gap-1.5 border border-red-400/50 w-32"
         >
-          <span className="text-lg">⚠️</span>
-          <span>Zgłoś Niebezpieczeństwo</span>
+          <span>⚠️ + Zgłoś</span>
         </button>
       </div>
 
