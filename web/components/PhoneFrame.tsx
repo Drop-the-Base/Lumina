@@ -18,41 +18,60 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <div className="w-full h-[100dvh] bg-gray-950 text-white flex flex-col md:flex-row items-center justify-center relative font-sans md:p-4 overflow-hidden">
-      {/* Desktop presentation sidebar */}
-      <div className="hidden md:flex flex-col items-start justify-center max-w-[300px] lg:max-w-sm z-20 absolute left-8 lg:left-[10%] xl:left-[15%]">
+    <div className="w-full min-h-screen bg-gray-950 text-white flex items-center justify-center relative font-sans p-4 overflow-hidden">
+      {/* Desktop Background Ambient Glow */}
+      <div className="hidden md:block absolute inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-violet-600/15 rounded-full blur-[150px]" />
+        <div className="absolute bottom-10 right-10 w-[450px] h-[450px] bg-pink-600/10 rounded-full blur-[130px]" />
+      </div>
+
+      {/* Floating Side Info Presentation Card (Desktop only - floating on left side) */}
+      <div className="hidden md:flex absolute left-6 lg:left-12 top-1/2 -translate-y-1/2 z-20 flex-col max-w-[280px] lg:max-w-xs space-y-3.5 text-left pointer-events-auto">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-pink-500 flex items-center justify-center text-xl font-bold shadow-xl shadow-violet-900/40">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-pink-500 flex items-center justify-center text-xl font-bold shadow-xl shadow-violet-900/40 shrink-0 border border-white/10">
             🛡️
           </div>
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-extrabold text-xl tracking-tight text-white">Lumina</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-950 text-violet-300 border border-violet-800">
-                Podgląd Aplikacji
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h1 className="font-black text-xl tracking-tight text-white">Lumina</h1>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-950 text-violet-300 border border-violet-800">
+                Prototyp
               </span>
             </div>
-            <p className="text-xs text-gray-400">ImpactHer · Bezpieczny powrót do domu</p>
+            <p className="text-[11px] font-semibold text-violet-400">ImpactHer · HackYeah 2026</p>
           </div>
         </div>
-        <p className="text-gray-500 text-xs mt-4 leading-relaxed">
-          Interaktywny prototyp aplikacji mobilnej. Przetestuj funkcje takie jak nawigacja do domu, zgłaszanie zagrożeń i tryb SOS bezpośrednio w przeglądarce.
-        </p>
+
+        <div className="bg-gray-900/80 border border-gray-800/90 rounded-2xl p-4 text-xs text-gray-300 leading-relaxed shadow-2xl space-y-2 backdrop-blur-md">
+          <div className="font-bold text-white text-xs flex items-center gap-1.5">
+            <span>📱 Interaktywny prototyp mobilny</span>
+          </div>
+          <p className="text-[11px] text-gray-300">
+            Przetestuj funkcje takie jak nawigacja do domu, zgłaszanie zagrożeń i tryb SOS bezpośrednio w przeglądarce.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {['Bezpieczna trasa', 'Dead Man’s Switch', 'Safe Havens', 'Alert SOS'].map((tag) => (
+            <span key={tag} className="px-2 py-0.5 bg-gray-900/90 border border-gray-800 rounded-lg text-[10px] text-gray-400">
+              {tag}
+            </span>
+          ))}
+        </div>
       </div>
 
-      {/* Desktop Background Ambient Glow */}
-      <div className="hidden md:block absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-violet-600/15 rounded-full blur-[140px]" />
-        <div className="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-pink-600/10 rounded-full blur-[120px]" />
-      </div>
+      {/* Perfectly Centered Phone Shell Container */}
+      <div className="relative z-10 w-full flex items-center justify-center my-auto">
+        {/* Phone Shell (desktop view - centered full smartphone aspect ratio) */}
+        <div className="hidden md:block relative w-[390px] h-[820px] max-h-[92vh] bg-gray-950 rounded-[50px] border-[12px] border-gray-900 shadow-[0_0_60px_rgba(124,58,237,0.25),0_25px_50px_-12px_rgba(0,0,0,0.95)] ring-1 ring-white/10 overflow-hidden transform-gpu shrink-0">
+          
+          {/* Side Buttons (Visual decoration) */}
+          <div className="absolute -left-[16px] top-28 w-[4px] h-10 bg-gray-800 rounded-l-md" /> {/* Volume Up */}
+          <div className="absolute -left-[16px] top-42 w-[4px] h-10 bg-gray-800 rounded-l-md" /> {/* Volume Down */}
+          <div className="absolute -right-[16px] top-32 w-[4px] h-16 bg-gray-800 rounded-r-md" /> {/* Power Button */}
 
-      {/* Smartphone Mockup Container — children are rendered exactly once:
-          rendering them twice (desktop + mobile copy) mounted two maps,
-          two sensor engines and doubled every API call. */}
-      <div className="relative z-10 flex items-center justify-center w-full h-full md:w-auto md:h-auto">
-        <div className="relative w-full h-full md:w-[400px] md:h-[850px] md:max-h-[calc(100dvh-2rem)] bg-gray-950 md:rounded-[50px] md:border-[12px] md:border-gray-900 md:shadow-[0_0_80px_rgba(124,58,237,0.25),0_25px_50px_-12px_rgba(0,0,0,0.95)] md:ring-1 md:ring-white/10 overflow-hidden transform-gpu">
-          {/* Top Status Bar & Dynamic Island (desktop mockup only) */}
-          <div className="hidden md:flex absolute top-0 left-0 right-0 h-11 px-6 items-center justify-between text-[11px] font-semibold text-white/90 z-50 pointer-events-none select-none bg-gradient-to-b from-gray-950/90 to-transparent">
+          {/* Top Status Bar & Dynamic Island */}
+          <div className="absolute top-0 left-0 right-0 h-11 px-6 flex items-center justify-between text-[11px] font-semibold text-white/90 z-50 pointer-events-none select-none bg-gradient-to-b from-gray-950/90 to-transparent">
             {/* Clock */}
             <span>{timeStr}</span>
 
@@ -78,12 +97,17 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
           </div>
 
           {/* Inner Phone Screen Content */}
-          <div className="relative w-full h-full md:pt-10 overflow-hidden flex flex-col scrollbar-none transform-gpu md:rounded-[38px]">
+          <div className="relative w-full h-full pt-10 overflow-hidden flex flex-col scrollbar-none transform-gpu">
             {children}
           </div>
 
           {/* Bottom Home Indicator Pill */}
-          <div className="hidden md:block absolute bottom-1 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/40 rounded-full z-50 pointer-events-none" />
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/40 rounded-full z-50 pointer-events-none" />
+        </div>
+
+        {/* Native Mobile Display (For actual mobile viewports) */}
+        <div className="block md:hidden w-full min-h-screen">
+          {children}
         </div>
       </div>
     </div>
