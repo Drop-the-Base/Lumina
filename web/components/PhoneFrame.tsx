@@ -18,15 +18,15 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <div className="w-full min-h-screen bg-gray-950 text-white flex items-center justify-center relative font-sans p-4 overflow-hidden">
+    <div className="w-full min-h-screen bg-gray-950 text-white md:grid md:grid-cols-[1fr_auto_1fr] flex items-center justify-center relative font-sans p-4 overflow-hidden">
       {/* Desktop Background Ambient Glow */}
       <div className="hidden md:block absolute inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-violet-600/15 rounded-full blur-[150px]" />
         <div className="absolute bottom-10 right-10 w-[450px] h-[450px] bg-pink-600/10 rounded-full blur-[130px]" />
       </div>
 
-      {/* Floating Side Info Presentation Card (Desktop only - floating on left side) */}
-      <div className="hidden md:flex absolute left-6 lg:left-12 top-1/2 -translate-y-1/2 z-20 flex-col max-w-[280px] lg:max-w-xs space-y-3.5 text-left pointer-events-auto">
+      {/* Side Info Presentation Card (Desktop only - perfectly centered in left column) */}
+      <div className="hidden md:flex flex-col z-20 max-w-[280px] lg:max-w-xs space-y-3.5 text-left pointer-events-auto mx-auto w-full px-2 xl:px-8 place-self-center">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-pink-500 flex items-center justify-center text-xl font-bold shadow-xl shadow-violet-900/40 shrink-0 border border-white/10">
             🛡️
@@ -110,6 +110,9 @@ export default function PhoneFrame({ children }: { children: React.ReactNode }) 
           {children}
         </div>
       </div>
+
+      {/* Empty right column to keep phone perfectly centered in grid */}
+      <div className="hidden md:block" />
     </div>
   );
 }
